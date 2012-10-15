@@ -1,0 +1,171 @@
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>uk.ac.bbsrc.tgac</groupId>
+  <artifactId>qc</artifactId>
+  <packaging>pom</packaging>
+  <version>1.0-SNAPSHOT</version>
+  <name>Stats DB Java API</name>
+  <url>http://www.tgac.bbsrc.ac.uk/software/</url>
+
+  <!-- Reporting/Documentation output -->
+  <reporting>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-javadoc-plugin</artifactId>
+        <version>2.7</version>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-project-info-reports-plugin</artifactId>
+        <version>2.2</version>
+        <reportSets>
+          <reportSet>
+            <reports>
+              <!-- <report>dependencies</report> -->
+              <report>project-team</report>
+              <report>mailing-list</report>
+              <report>cim</report>
+              <report>issue-tracking</report>
+              <report>license</report>
+              <report>scm</report>
+              <report>index</report>
+            </reports>
+          </reportSet>
+        </reportSets>
+      </plugin>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-release-plugin</artifactId>
+        <version>2.1</version>
+        <configuration>
+          <preparationGoals>clean verify install</preparationGoals>
+        </configuration>
+      </plugin>
+    </plugins>
+  </reporting>
+
+  <!-- Licensing -->
+  <licenses>
+    <license>
+      <name>GNU Lesser General Public License</name>
+      <url>http://www.gnu.org/copyleft/lesser.html</url>
+      <distribution>repo</distribution>
+    </license>
+  </licenses>
+
+  <!-- Developer Listing -->
+  <developers>
+    <developer>
+      <id>ramirezr</id>
+      <name>Ricardo Ramirez</name>
+      <email>Ricardo.Ramirez-Gonzalez@tgac.ac.uk</email>
+      <organization>TGAC</organization>
+      <organizationUrl>http://www.tgac.ac.uk/bioinformatics/sequence-informatics/core-bioinformatics/</organizationUrl>
+      <roles>
+        <role>administrator</role>
+        <role>Developer</role>
+      </roles>
+      <timezone>0</timezone>
+      <properties/>
+    </developer>
+
+    <developer>
+      <id>davey</id>
+      <name>Rob Davey</name>
+      <email>robert.davey@tgac.ac.uk</email>
+      <organization>TGAC</organization>
+      <organizationUrl>http://www.tgac.ac.uk/bioinformatics/sequence-informatics/core-bioinformatics/</organizationUrl>
+      <roles>
+        <role>administrator</role>
+        <role>Developer</role>
+      </roles>
+      <timezone>0</timezone>
+      <properties/>
+    </developer>
+  </developers>
+
+  <!-- SVN connection -->
+  <scm>
+    <connection>
+      scm:svn:https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+    </connection>
+    <developerConnection>
+      scm:svn:https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+    </developerConnection>
+    <url>
+      https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+    </url>
+  </scm>
+
+  <!-- Maven repository deploy -->
+  <distributionManagement>
+    <downloadUrl>https://repos.tgac.bbsrc.ac.uk/maven/repo</downloadUrl>
+    <repository>
+      <id>tgac-repo</id>
+      <name>TGAC repository</name>
+      <url>scp://repos.tgac.bbsrc.ac.uk/var/www/html/maven/repo</url>
+    </repository>
+    <snapshotRepository>
+      <id>tgac-repo</id>
+      <name>TGAC repository</name>
+      <url>scp://repos.tgac.bbsrc.ac.uk/var/www/html/maven/repo</url>
+    </snapshotRepository>
+  </distributionManagement>
+
+  <!-- Maven repository download -->
+  <repositories>
+    <repository>
+      <id>tgac-repo</id>
+      <name>TGAC Maven Repository</name>
+      <url>https://repos.tgac.bbsrc.ac.uk/maven/repo</url>
+      <releases>
+        <updatePolicy>always</updatePolicy>
+      </releases>
+      <snapshots>
+        <enabled>true</enabled>
+        <updatePolicy>always</updatePolicy>
+      </snapshots>
+    </repository>
+  </repositories>
+
+
+  <pluginRepositories>
+    <pluginRepository>
+      <id>tgac-repo</id>
+      <name>TGAC Maven Repository</name>
+      <url>https://repos.tgac.bbsrc.ac.uk/maven/repo</url>
+    </pluginRepository>
+  </pluginRepositories>
+
+  <!-- Required Build Plugins -->
+  <build>
+    <plugins>
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <configuration>
+          <source>1.6</source>
+          <target>1.6</target>
+        </configuration>
+      </plugin>
+    </plugins>
+
+    <pluginManagement>
+      <plugins>
+        <plugin>
+          <groupId>org.apache.maven.plugins</groupId>
+          <artifactId>maven-site-plugin</artifactId>
+          <version>2.1.1</version>
+        </plugin>
+      </plugins>
+    </pluginManagement>
+  </build>
+
+  <modules>
+    <module>run</module>
+  </modules>
+
+</project>
