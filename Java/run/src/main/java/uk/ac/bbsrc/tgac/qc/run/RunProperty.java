@@ -8,5 +8,15 @@ package uk.ac.bbsrc.tgac.qc.run;
  * To change this template use File | Settings | File Templates.
  */
 public enum RunProperty {
-    encoding, casava_version, chemestry, instrument, softwareOnInstrument,typeOfExperiment, pair, sampleName, lane, barcode, run
+  encoding,
+  casava_version,
+  chemistry,
+  instrument,
+  softwareOnInstrument,
+  typeOfExperiment,
+  pair,
+  sampleName,
+  lane,
+  barcode,
+  run
 }
