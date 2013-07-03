@@ -1,6 +1,8 @@
 package uk.ac.bbsrc.tgac.qc.run.parser;
 
 import net.sourceforge.fluxion.spi.Spi;
+import uk.ac.bbsrc.tgac.qc.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
 
 /**
  * uk.ac.bbsrc.tgac.qc.run.parser
@@ -12,6 +14,6 @@ import net.sourceforge.fluxion.spi.Spi;
  * @since 1.0-SNAPSHOT
  */
 @Spi
-public interface QcReportParser {
-
+public interface QcReportParser<T> {
+  void parseReport(T in, QCAnalysis qcAnalysis) throws QCAnalysisException;
 }

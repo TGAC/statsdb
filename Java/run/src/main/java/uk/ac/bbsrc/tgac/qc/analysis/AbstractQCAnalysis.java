@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
  * @since 1.0-SNAPSHOT
  */
 public class AbstractQCAnalysis implements QCAnalysis {
-  long id = 0L;
+  private long id = 0L;
 
   private Map<String,String> properties;
   private Map<String,String> valueTypes;
@@ -26,8 +26,12 @@ public class AbstractQCAnalysis implements QCAnalysis {
   private List<PartitionValue> partitionValues;
   private List<PositionValue> positionValues;
 
-  private final Pattern rangeSpan = Pattern.compile("([0-9]+)-([0-9]+)");
-  private final Pattern rangePoint = Pattern.compile("([0-9]+)");
+  private static final Pattern rangeSpan = Pattern.compile("([0-9]+)-([0-9]+)");
+  private static final Pattern rangePoint = Pattern.compile("([0-9]+)");
+
+  public void setId(long id) {
+    this.id = id;
+  }
 
   @Override
   public long getId() {
@@ -109,7 +113,7 @@ public class AbstractQCAnalysis implements QCAnalysis {
     return valueDescriptions;
   }
 
-  private Map.Entry<Long, Long> parseRange(String range) throws QCAnalysisException {
+  public static Map.Entry<Long, Long> parseRange(String range) throws QCAnalysisException {
     if (range != null) {
       long min = 0L;
       long max = 0L;
@@ -127,7 +131,7 @@ public class AbstractQCAnalysis implements QCAnalysis {
     }
   }
 
-  private Map.Entry<String, String> rangeToSize(String range) throws QCAnalysisException {
+  public static Map.Entry<String, String> rangeToSize(String range) throws QCAnalysisException {
     Map.Entry<Long, Long> kv = parseRange(range);
     long from = kv.getKey();
     long to = kv.getValue();
