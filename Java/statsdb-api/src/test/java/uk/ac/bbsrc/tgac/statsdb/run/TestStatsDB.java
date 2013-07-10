@@ -34,13 +34,13 @@ public class TestStatsDB {
   private static DataSource datasource;
 
   private static final String[] tables = {
-          "analysis",
-          "analysis_property",
-          "analysis_value",
-          "per_partition_value",
-          "per_position_value",
-          "type_scope",
-          "value_type"
+      "analysis",
+      "analysis_property",
+      "analysis_value",
+      "per_partition_value",
+      "per_position_value",
+      "type_scope",
+      "value_type"
   };
 
   @BeforeClass
@@ -52,18 +52,25 @@ public class TestStatsDB {
     log.info("Properties loaded...");
 
     Connection jdbcConnection = DriverManager.getConnection(
-            props.getProperty("db.url"),
-            props.getProperty("db.username"),
-            props.getProperty("db.password")
+        props.getProperty("db.url"),
+        props.getProperty("db.username"),
+        props.getProperty("db.password")
     );
     datasource = new SingleConnectionDataSource(jdbcConnection, false);
   }
 
   @AfterClass
-  public static void tearDown() throws Exception {
+  public static void tearDown() throws SQLException {
     log.info("Final teardown...");
     Connection conn = datasource.getConnection();
-    conn.close();
+    try {
+      if (conn != null) {
+        conn.close();
+      }
+    }
+    catch (SQLException e) {
+      e.printStackTrace();
+    }
   }
 
   @Test
@@ -88,9 +95,6 @@ public class TestStatsDB {
     catch (IOException e1) {
       e1.printStackTrace();
     }
-    catch (Exception e1) {
-      e1.printStackTrace();
-    }
   }
 
   @Test
@@ -106,9 +110,6 @@ public class TestStatsDB {
       log.info(tmp_list.toString());
     }
     catch (SQLException e1) {
-      e1.printStackTrace();
-    }
-    catch (Exception e1) {
       e1.printStackTrace();
     }
   }
@@ -128,9 +129,6 @@ public class TestStatsDB {
     catch (SQLException e1) {
       e1.printStackTrace();
     }
-    catch (Exception e1) {
-      e1.printStackTrace();
-    }
   }
 
   @Test
@@ -145,9 +143,6 @@ public class TestStatsDB {
       log.info(Double.toString(r.getAverageValue("general_total_sequences", "lane", "7")));
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -165,9 +160,6 @@ public class TestStatsDB {
       log.info(table.toCSV());
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -189,9 +181,6 @@ public class TestStatsDB {
       log.info(table.toCSV());
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -224,8 +213,6 @@ public class TestStatsDB {
 
       table = r.getPerPositionValues("quality_mean", properties);
       log.info(table.toCSV());
-
-
     }
     catch (SQLException e) {
       e.printStackTrace();
@@ -233,36 +220,27 @@ public class TestStatsDB {
     catch (IOException e) {
       e.printStackTrace();
     }
-    catch (Exception e) {
-      e.printStackTrace();
-    }
   }
 
-   @Test
+  @Test
   public void testGetPerBaseQuality() {
     try {
       TestCase.assertNotNull(datasource);
       Connection con = datasource.getConnection();
 
-      Map<RunProperty, String> properties = new HashMap<RunProperty, String>();
+      Map<RunProperty, String> properties = new HashMap<>();
       Reports r = new Reports(con);
       ReportsDecorator rd = new ReportsDecorator(r);
 
-      Map<String, ReportTable> perBaseQuality  = rd.getPerPositionBaseSequenceQuality(properties);
+      Map<String, ReportTable> perBaseQuality = rd.getPerPositionBaseSequenceQuality(properties);
 
-
-      log.info("Tables in quality per base: "+perBaseQuality.keySet().toString());
-      for(String k: perBaseQuality.keySet()){
-          log.info("Quality table: " + k);
-          log.info(perBaseQuality.get(k).toCSV());
+      log.info("Tables in quality per base: " + perBaseQuality.keySet().toString());
+      for (String k : perBaseQuality.keySet()) {
+        log.info("Quality table: " + k);
+        log.info(perBaseQuality.get(k).toCSV());
       }
-
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -273,21 +251,14 @@ public class TestStatsDB {
       TestCase.assertNotNull(datasource);
       Connection con = datasource.getConnection();
 
-      Map<RunProperty, String> properties = new HashMap<RunProperty, String>();
+      Map<RunProperty, String> properties = new HashMap<>();
       Reports r = new Reports(con);
       ReportsDecorator rd = new ReportsDecorator(r);
-
-     // Map<String, ReportTable> perBaseQuality  = rd.getPerPositionBaseSequenceQuality(properties);
       ReportTable rt = rd.getOverrepresentedSequences(properties);
 
-      log.info("Overrepresented sequences: "+ rt.toCSV());
-
+      log.info("Overrepresented sequences: " + rt.toCSV());
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -298,25 +269,19 @@ public class TestStatsDB {
       TestCase.assertNotNull(datasource);
       Connection con = datasource.getConnection();
 
-      Map<RunProperty, String> properties = new HashMap<RunProperty, String>();
+      Map<RunProperty, String> properties = new HashMap<>();
       Reports r = new Reports(con);
       ReportsDecorator rd = new ReportsDecorator(r);
 
-      Map<String, ReportTable> perBaseQuality  = rd.getPerPositionBaseContent(properties);
+      Map<String, ReportTable> perBaseQuality = rd.getPerPositionBaseContent(properties);
 
-
-      log.info("Tables in base content: "+perBaseQuality.keySet().toString());
-      for(String k: perBaseQuality.keySet()){
-          log.info("Content table: " + k);
-          log.info(perBaseQuality.get(k).toCSV());
+      log.info("Tables in base content: " + perBaseQuality.keySet().toString());
+      for (String k : perBaseQuality.keySet()) {
+        log.info("Content table: " + k);
+        log.info(perBaseQuality.get(k).toCSV());
       }
-
     }
     catch (SQLException e) {
-      e.printStackTrace();
-    }
-
-    catch (Exception e) {
       e.printStackTrace();
     }
   }
@@ -331,19 +296,12 @@ public class TestStatsDB {
       Reports r = new Reports(con);
       ReportsDecorator rd = new ReportsDecorator(r);
 
-     // Map<String, ReportTable> perBaseQuality  = rd.getPerPositionBaseSequenceQuality(properties);
       ReportTable rt = rd.getOverrepresentedTags(properties);
 
-      log.info("Overrepresented tag s: "+ rt.toCSV());
-
+      log.info("Overrepresented tags: " + rt.toCSV());
     }
     catch (SQLException e) {
       e.printStackTrace();
     }
-
-    catch (Exception e) {
-      e.printStackTrace();
-    }
   }
-
 }
