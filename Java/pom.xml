@@ -165,7 +165,7 @@
   </build>
 
   <modules>
-    <module>run</module>
+    <module>statsdb-api</module>
   </modules>
 
   <properties>

@@ -9,7 +9,7 @@
 
   <modelVersion>4.0.0</modelVersion>
   <groupId>uk.ac.bbsrc.tgac.statsdb</groupId>
-  <artifactId>run</artifactId>
+  <artifactId>statsdb-api</artifactId>
   <packaging>jar</packaging>
   <version>${parent.version}</version>
   <name>StatsDB - Run QC API</name>
