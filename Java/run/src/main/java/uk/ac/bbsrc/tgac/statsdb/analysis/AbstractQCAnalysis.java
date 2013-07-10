@@ -1,6 +1,6 @@
-package uk.ac.bbsrc.tgac.qc.analysis;
+package uk.ac.bbsrc.tgac.statsdb.analysis;
 
-import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 import java.util.AbstractMap;
 import java.util.List;

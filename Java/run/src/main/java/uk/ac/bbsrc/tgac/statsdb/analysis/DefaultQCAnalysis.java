@@ -1,4 +1,4 @@
-package uk.ac.bbsrc.tgac.qc.analysis;
+package uk.ac.bbsrc.tgac.statsdb.analysis;
 
 /**
  * uk.ac.bbsrc.tgac.qc.analysis

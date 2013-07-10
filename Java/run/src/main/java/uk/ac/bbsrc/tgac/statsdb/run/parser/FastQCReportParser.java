@@ -1,10 +1,10 @@
-package uk.ac.bbsrc.tgac.qc.run.parser;
+package uk.ac.bbsrc.tgac.statsdb.run.parser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import uk.ac.bbsrc.tgac.qc.analysis.QCAnalysis;
-import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
-import uk.ac.bbsrc.tgac.qc.util.StatsDBUtils;
+import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.util.StatsDBUtils;
 
 import java.io.*;
 import java.lang.reflect.InvocationTargetException;

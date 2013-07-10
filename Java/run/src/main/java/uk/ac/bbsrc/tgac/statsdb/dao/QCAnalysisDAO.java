@@ -1,7 +1,7 @@
-package uk.ac.bbsrc.tgac.qc.dao;
+package uk.ac.bbsrc.tgac.statsdb.dao;
 
-import uk.ac.bbsrc.tgac.qc.analysis.QCAnalysis;
-import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 /**
  * uk.ac.bbsrc.tgac.qc.dao

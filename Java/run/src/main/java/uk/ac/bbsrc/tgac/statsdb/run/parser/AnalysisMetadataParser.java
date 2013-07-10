@@ -1,8 +1,8 @@
-package uk.ac.bbsrc.tgac.qc.run.parser;
+package uk.ac.bbsrc.tgac.statsdb.run.parser;
 
-import uk.ac.bbsrc.tgac.qc.analysis.DefaultQCAnalysis;
-import uk.ac.bbsrc.tgac.qc.analysis.QCAnalysis;
-import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.analysis.DefaultQCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 import java.io.*;
 import java.util.ArrayList;

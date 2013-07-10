@@ -1,4 +1,4 @@
-package uk.ac.bbsrc.tgac.qc.run;
+package uk.ac.bbsrc.tgac.statsdb.run;
 
 import org.codehaus.jackson.map.ObjectMapper;
 

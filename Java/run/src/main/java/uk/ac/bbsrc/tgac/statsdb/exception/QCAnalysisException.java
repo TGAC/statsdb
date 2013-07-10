@@ -1,4 +1,4 @@
-package uk.ac.bbsrc.tgac.qc.exception;
+package uk.ac.bbsrc.tgac.statsdb.exception;
 
 /**
  * uk.ac.bbsrc.tgac.qc.exception

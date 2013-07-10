@@ -1,8 +1,8 @@
-package uk.ac.bbsrc.tgac.qc.run.parser;
+package uk.ac.bbsrc.tgac.statsdb.run.parser;
 
 import net.sourceforge.fluxion.spi.Spi;
-import uk.ac.bbsrc.tgac.qc.analysis.QCAnalysis;
-import uk.ac.bbsrc.tgac.qc.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 /**
  * uk.ac.bbsrc.tgac.qc.run.parser
