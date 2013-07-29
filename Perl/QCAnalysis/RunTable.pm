@@ -32,10 +32,11 @@ sub parse_file(){
 		chomp $to_parse;
 		my @line = split(/\t/, $to_parse); 
 		my $analysis = QCAnalysis->new();
+
 		for(my $i = 0; $i < @header; $i++){
 			my $key = $header[$i];
 			my $value = $line[$i];
-			
+
 			$analysis->add_property($key, $value);	
 		
 		}

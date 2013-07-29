@@ -211,7 +211,7 @@ sub insert_values(){
 		if(defined $id_values{$key}){
 			$id_value = $id_values{$key};
 			my $ins_gv = "INSERT INTO analysis_value (analysis_id, value_type_id, value) VALUES ('".$analysis->{id}."', $id_value, $value);";
-#			print $ins_gv."\n";
+		#	print $ins_gv."\n";
 			$inserted &= $db->do($ins_gv);
 		}else{
 			unless(defined $warn_printed{$key} ){
