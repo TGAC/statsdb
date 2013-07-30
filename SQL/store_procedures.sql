@@ -201,7 +201,8 @@ BEGIN
     GROUP BY value_type.id, position, size
 	ORDER BY Position;
 END$$
- call summary_per_position_for_run("quality_mean", NULL, NULL, NULL, NULL, NULL)$$
+
+call summary_per_position_for_run("quality_mean", NULL, NULL, NULL, NULL, NULL)$$
 
 -- call summary_per_position_for_run("quality_mean",NULL, NULL, "1", NULL, NULL)$$
 
@@ -274,5 +275,29 @@ BEGIN
 END$$
 
 call summary_value("multiplex_tag", NULL, NULL, NULL, NULL, NULL)$$
+
+
+DROP PROCEDURE IF EXISTS list_runs$$
+CREATE PROCEDURE list_runs(
+	IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN barcode_in VARCHAR(500))
+BEGIN
+    
+    SELECT  
+    *
+    FROM  latest_run as run
+    WHERE  IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
+		AND IF(run_in IS NULL, TRUE, run.run = run_in)
+		AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in ) 
+		AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
+		AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+		;
+
+END$$
+
+call list_runs( NULL, NULL, NULL, NULL, NULL)$$
 
 delimiter ;
