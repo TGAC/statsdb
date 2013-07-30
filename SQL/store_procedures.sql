@@ -113,7 +113,7 @@ SELECT
     property.id as analysis_id, 
     MAX(property.encoding) as encoding, 
     MAX(property.casava) as casava,  
-    MAX(property.chemestry) as chemestry,
+    MAX(property.chemistry) as chemistry,
     MAX(property.instrument) as instrument, 
     MAX(property.software) as software, 
     MAX(property.type) as type,
