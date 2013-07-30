@@ -1,0 +1,197 @@
+#!/usr/bin/perl
+use strict;
+use Getopt::Long;
+use Pod::Usage;
+
+my $experiment_type;
+my $path_to_analysis1;
+my $path_to_analysis2;
+my $path_to_analysis_shared;
+my $instrument;
+my $chemistry_version;
+my $software_on_instrument_version;
+my $cassava_version;
+my $sample_name;
+my $lane;
+my $barcode;
+my $pair;
+my $path="";
+my $help;
+my $sample_sheet;
+my $sample_sheet_string;
+my $counter = 0;
+my $pair1;
+my $pair2;
+my $run;
+
+&GetOptions(
+	'e=s'	=> \$experiment_type,
+	'i=s'	=> \$instrument,
+	'c=s'	=> \$chemistry_version,
+	's=s'	=> \$software_on_instrument_version,
+	'v=s'	=> \$cassava_version,
+	'p=s'	=> \$path,
+	'b=s'	=> \$sample_sheet,
+	'bs=s'	=> \$sample_sheet_string,
+	'r=s'	=> \$run,
+	'h'	=> \$help,
+	);
+
+if ($help){
+print "\nUSAGE: statsQC\n
+	-e	TYPE_OF_EXPERIMENT (DNA/RNA)
+	-i	INSTRUMENT (HISEQ1,HISEQ2 etc.)
+	-c	CHEMISTRY_VERSION (INSTRUMENT CHEMISTRY VERSION)
+	-s	SOFTWARE_ON_INSTRUMENT_VERSION (RTA VERSION ON INSTRUMENT)
+	-v	CASAVA_VERSION (1.8.2, 1.7.0 ETC.)
+	-p	RUN_FOLDER (PATH TO FOLDER CONTAINING THE PROJECTS, e.g. */BaseCalls/Unaligned/, or \".\"
+                assumes current location if argument is not provided, i.e. defaults to \".\")
+	-b	SampleSheet.csv
+	-bs	SampleSheet as a String to write to disk
+	-r	Run title (e.g. 120118_SN7001150_0058_BC0FRPACXX)
+	-h	Print this help message\n\n";
+exit;
+}
+
+unless (($experiment_type and $instrument and $chemistry_version and $software_on_instrument_version and $cassava_version and $run) or $help){
+print "\nUSAGE: statsQC\n
+	-e	TYPE_OF_EXPERIMENT (DNA/RNA)
+	-i	INSTRUMENT (HISEQ1,HISEQ2 etc.)
+	-c	CHEMISTRY_VERSION (INSTRUMENT CHEMISTRY VERSION)
+	-s	SOFTWARE_ON_INSTRUMENT_VERSION (RTA VERSION ON INSTRUMENT)
+	-v	CASAVA_VERSION (1.8.2, 1.7.0 ETC.)
+	-p	RUN_FOLDER (PATH TO FOLDER CONTAINING THE PROJECTS, e.g. */BaseCalls/Unaligned/, or \".\"
+                assumes current location if argument is not provided, i.e. defaults to \".\")
+	-b	SampleSheet.csv
+	-bs     SampleSheet as a String to write to disk
+	-r	Run title (e.g. 120118_SN7001150_0058_BC0FRPACXX)
+	-h	Print this help message\n\n";
+exit;
+}
+
+# A check to see if the user provided a "." character to indicate the location of the directory containing the projects,
+# if no argument is provided for the "path" then the current path is assumed, i.e. the same effect as "."
+if ($path eq "." or $path eq ""){
+  $path = `pwd`;
+  chomp $path;
+  $path .= "\/" unless $path =~ m(\/$);
+}
+
+# List all the Sample within all the different projects in one string
+#my $projects = `echo $path\/Project*/Sample*`;
+#chomp $projects;
+
+#my @samples = glob $path."Project*/Sample*";
+
+# Parse the SampleSheet.csv and pass the fields to the variables below
+################################################
+
+if ($sample_sheet_string ne "") {
+	$sample_sheet_string =~ s/\\n/\r\n/g;
+	unless(-e $sample_sheet) {
+		open(FH, ">$sample_sheet");
+		print FH $sample_sheet_string;
+		close(FH);
+	}
+}
+
+#system("dos2unix", "-o", $sample_sheet);
+#if ( $? == -1 ) { print "command failed: $!\n"; }
+#else { printf "command exited with value %d\n", $? >> 8;}
+
+#open(SDSH, ">".$path."/statsDB_string.txt");
+open(SDSH, ">./statsDB_string_TEST.txt");
+
+# Print the header
+print SDSH "TYPE_OF_EXPERIMENT\tPATH_TO_ANALYSIS\tANALYSIS_TYPE\tINSTRUMENT\tCHEMISTRY_VERSION\tSOFTWARE_ON_INSTRUMENT_VERSION\tCASSAVA_VERSION\tRUN_FOLDER\tSAMPLE_NAME\tLANE\tBARCODE\tPAIR\tRUN\n";
+
+local $/ = undef;
+
+open (FH,"$sample_sheet") || die "Cannot open the SampleSheet.csv $sample_sheet\n";
+my $content = <FH>;
+my @lines = split /\r\n|\n|\r/, $content;
+close(FH);
+
+local $/ = "\n";
+
+#get around line break problem
+#while (<FH>){
+
+foreach my $line (@lines) {
+    chomp;
+    if ($counter > 0){
+	### FastQC ###
+        my ($fcid,$lane,$sampleid,$sampleref,$index,$description,$control,$recipe,$operator,$project) = split(/,/, $line);
+        # First pair grab
+        my $pp1 = $path."/Project_".$project."/Sample_".$sampleid."/Stats/*L00".$lane."*R1*fastqc/fastqc_data.txt";
+        $path_to_analysis1 = `echo $pp1`;
+        chomp $path_to_analysis1;
+        $path_to_analysis1 =~ /.*L00\d_R(\d)_(\d{3}_)*fastqc.*/;
+        $pair1 = $1;
+
+        #Second pair grab
+        my $pp2 = $path."/Project_".$project."/Sample_".$sampleid."/Stats/*L00".$lane."*R2*fastqc/fastqc_data.txt";
+        $path_to_analysis2 = `echo $pp2`;
+        chomp $path_to_analysis2;
+        $path_to_analysis2 =~ /.*L00\d_R(\d)_(\d{3}_)*fastqc.*/;
+        $pair2 = $1;
+
+        # First pair print
+        my $stats_DB_string1 = $experiment_type ."\t" . $path_to_analysis1 ."\tFastQC\t"  .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair1 . "\t".$run;
+        if (-e $path_to_analysis1){
+            print SDSH "$stats_DB_string1\n";
+        }
+        else {
+	    print "Can't find [$path_to_analysis1]\n";
+        }
+        
+        # Second pair print
+        my $stats_DB_string2 = $experiment_type ."\t" . $path_to_analysis2 ."\tFastQC\t"  .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair2 . "\t".$run;
+        if (-e $path_to_analysis2){
+            print SDSH "$stats_DB_string2\n";
+        }
+        else {
+            print "Can't find [$path_to_analysis2]\n";
+        }
+
+	### KmerContamination ###
+    	my $pp = $path."/ScreeningReports";
+    	
+	opendir(DIR, $pp) or die $!;
+
+    	while (my $dir = readdir(DIR)) {
+	
+	    if ((-d "$pp/$dir") && ($dir !~ /^\./)) {
+		$path_to_analysis_shared = $pp."/".$dir."/".$project."_".$sampleid."_".$dir.".txt";
+		chomp $path_to_analysis_shared;
+		my $stats_DB_string_shared = $experiment_type ."\t" . $path_to_analysis_shared ."\tKmerContamination\t" .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t0\t".$run;
+        	if (-e $path_to_analysis2){
+            		print SDSH "$stats_DB_string_shared\n";
+       		} else {
+            		print "Can't find [$path_to_analysis_shared]\n";
+        	}
+	    }
+	    next;
+    	}
+
+    	closedir(DIR);
+
+	
+    }
+    $counter++;
+}
+
+close(SDSH);
+
+
+################################################
+
+# Split all the samples under all the projects and push them to an array
+#my @samples = split(/\s/,$projects);
+
+# Iterate through the array containing the samples directories and create a "Stats" directory in each one and initiate FastQC on each sample
+#foreach my $sample(@samples){
+#system("mkdir $sample\/Stats");
+#system("bsub fastqc  $sample\/*.gz --extract --casava --outdir $sample\/Stats\/");
+#}
+
