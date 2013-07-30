@@ -99,8 +99,8 @@ if ($sample_sheet_string ne "") {
 #if ( $? == -1 ) { print "command failed: $!\n"; }
 #else { printf "command exited with value %d\n", $? >> 8;}
 
-#open(SDSH, ">".$path."/statsDB_string.txt");
-open(SDSH, ">./statsDB_string_TEST.txt");
+open(SDSH, ">".$path."/statsDB_string.txt");
+#open(SDSH, ">./statsDB_string_TEST.txt");
 
 # Print the header
 print SDSH "TYPE_OF_EXPERIMENT\tPATH_TO_ANALYSIS\tANALYSIS_TYPE\tINSTRUMENT\tCHEMISTRY_VERSION\tSOFTWARE_ON_INSTRUMENT_VERSION\tCASSAVA_VERSION\tRUN_FOLDER\tSAMPLE_NAME\tLANE\tBARCODE\tPAIR\tRUN\n";
