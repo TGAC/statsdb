@@ -15,8 +15,8 @@ import org.junit.runners.Suite;
 
 @RunWith(Suite.class)
 @Suite.SuiteClasses({
-  TestStatsDB.class
+  TestFastQCParser.class
 })
 
-public class AllTestsSuite {
+public class ApiTestSuite {
 }

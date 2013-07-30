@@ -20,7 +20,12 @@
         <artifactId>maven-surefire-plugin</artifactId>
         <version>2.5</version>
         <configuration>
-          <skip>true</skip>
+          <includes>
+            <include>**/ApiTestSuite.java</include>
+          </includes>
+          <reportFormat>brief</reportFormat>
+          <useFile>alse</useFile>
+          <forkMode>once</forkMode>
         </configuration>
       </plugin>
 
@@ -131,7 +136,7 @@
               <skip>false</skip>
 
               <includes>
-                <include>**/*Suite.java</include>
+                <include>**/DbTestSuite.java</include>
               </includes>
               <reportFormat>brief</reportFormat>
               <useFile>false</useFile>

@@ -2,6 +2,7 @@ package uk.ac.bbsrc.tgac.statsdb.run.parser;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import uk.ac.bbsrc.tgac.statsdb.analysis.AbstractQCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 import uk.ac.bbsrc.tgac.statsdb.util.StatsDBUtils;
@@ -93,21 +94,38 @@ public class FastQCReportParser implements QcReportParser<File> {
   }
 
   private void processFastQCReportFile(FileInputStream r, QCAnalysis qcAnalysis) throws QCAnalysisException {
+    StringBuilder sb = new StringBuilder();
     BufferedReader br = null;
     try {
       br = new BufferedReader(new InputStreamReader(r));
       String line;
       while ((line = br.readLine()) != null) {
-        Matcher m = moduleNamePattern.matcher(line);
-        if (m.matches()) {
-          String[] module = m.group(1).split("[\\s]+");
-          String moduleName = "";
-          for (String s : module) {
-            moduleName += StatsDBUtils.capitalise(s);
+        if (line.startsWith("##")) {
+          qcAnalysis.addProperty("FastQC", line.split("\\s+")[1]);
+        }
+        else {
+          sb.append(line).append("\n");
+        }
+      }
+      String report = sb.toString();
+
+      for (String module : report.split(MODULE_END_REGEX)) {
+        for (String modline : module.split("\\n")) {
+          Matcher m = moduleNamePattern.matcher(modline);
+          if (m.matches()) {
+            String[] moduleInfo = m.group(1).split("\\s+");
+            String moduleName = "";
+            for (String s : moduleInfo) {
+              moduleName += StatsDBUtils.capitalise(s);
+            }
+            log.info("Attempting to parse module: " + moduleName);
+            //Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, FileInputStream.class, QCAnalysis.class);
+            Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, String.class, QCAnalysis.class);
+            parseMethod.setAccessible(true);
+            log.info("Calling " + parseMethod.toString());
+            //parseMethod.invoke(this, r, qcAnalysis);
+            parseMethod.invoke(this, module, qcAnalysis);
           }
-          log.info("Attempting to parse module: " + moduleName);
-          Method parseMethod = this.getClass().getMethod("parse" + moduleName, FileInputStream.class, QCAnalysis.class);
-          parseMethod.invoke(this, r, qcAnalysis);
         }
       }
     }
@@ -138,18 +156,35 @@ public class FastQCReportParser implements QcReportParser<File> {
     }
   }
 
-  private void parseBasicStatistics(FileInputStream r, QCAnalysis qcAnalysis) throws IOException {
-    BufferedReader br = newReader(r);
-    String line;
-    try {
-      while ((line = br.readLine()) != null) {
-        //Matcher m = modulePattern.matcher(line);
-
+  private void parseBasicStatistics(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    //TODO regex not working
+    Pattern basicStatsPattern = Pattern.compile("^([A-z0-9]+\\s{0,1})\\t+(.*)$");
+    for (String line : module.split("\\n")) {
+      if (!line.startsWith("#")) {
+        Matcher m = basicStatsPattern.matcher(line);
+        if (m.matches() && m.group(1) != null && m.group(2) != null) {
+          log.info(line);
+          if("Sequence length".equals(m.group(1))) {
+            Map.Entry<Long, Long> range = AbstractQCAnalysis.parseRange(m.group(2));
+            qcAnalysis.addGeneralValue("general_min_length", String.valueOf(range.getKey()), null);
+            qcAnalysis.addGeneralValue("general_max_length", String.valueOf(range.getValue()), null);
+          }
+          else if (valueKeys.containsKey(m.group(1))) {
+            qcAnalysis.addGeneralValue(valueKeys.get(m.group(1)), m.group(2), null);
+          }
+          else {
+            qcAnalysis.addProperty(m.group(1), m.group(2));
+          }
+        }
       }
     }
-    finally {
-      closeReader(br);
-    }
+  }
+
+  private void parseBasicStatistics(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    log.info(""+r.getChannel().position());
+    Pattern basicStatsPattern = Pattern.compile("([\\S| ]+)\\s+([\\S| ]+)");
+    String module = getModuleBlock(r);
+    parseBasicStatistics(module, qcAnalysis);
   }
 
   private void parsePerBaseSequenceQuality(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
@@ -186,26 +221,36 @@ public class FastQCReportParser implements QcReportParser<File> {
 
   private void parseOverrepresentedSequences(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     String s = getModuleBlock(r);
-
-    /*
-      my $analysis = shift;
-      my $to_parse = shift;
-      my @line = split(/\t/, $to_parse);
-      $values{$line[0]} = "overrepresented_sequence";
-      $analysis->add_general_value($line[0], $line[1], $line[3]);
-    */
+    for (String line : s.split("\\n")) {
+      if (!line.startsWith("#")) {
+        //split on whitespace that's two or more characters. this should catch tabs and non-intra-word spaces
+        String[] tokens = line.split("\\s\\s+");
+        if (tokens.length >= 4) {
+          values.put(tokens[0], "overrepresented_sequence");
+          qcAnalysis.addGeneralValue(tokens[0], tokens[1], tokens[3]);
+        }
+        else {
+          throw new QCAnalysisException("Malformed overrepresented sequence line");
+        }
+      }
+    }
   }
 
   private void parseKmerContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     String s = getModuleBlock(r);
-
-    /*
-      my $analysis = shift;
-      my $to_parse = shift;
-      my @line = split(/\t/, $to_parse);
-      $values{$line[0]} = "overrepresented_kmer";
-      $analysis->add_general_value($line[0], $line[1]);
-    */
+    for (String line : s.split("\\n")) {
+      if (!line.startsWith("#")) {
+        //split on whitespace that's two or more characters. this should catch tabs and non-intra-word spaces
+        String[] tokens = line.split("\\s\\s+");
+        if (tokens.length >= 2) {
+          values.put(tokens[0], "overrepresented_kmer");
+          qcAnalysis.addGeneralValue(tokens[0], tokens[1], null);
+        }
+        else {
+          throw new QCAnalysisException("Malformed overrepresented kmer line");
+        }
+      }
+    }
   }
 
   private void parsePartition(FileInputStream r, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
@@ -245,7 +290,8 @@ public class FastQCReportParser implements QcReportParser<File> {
 
         if (lineFunctions.containsKey(func)) {
           try {
-            Method qcam = this.getClass().getMethod(func, QCAnalysis.class, String.class);
+            Method qcam = this.getClass().getDeclaredMethod(func, QCAnalysis.class, String.class);
+            qcam.setAccessible(true);
             qcam.invoke(this, qcAnalysis, line);
           }
           catch (NoSuchMethodException e) {
@@ -262,7 +308,8 @@ public class FastQCReportParser implements QcReportParser<File> {
           String[] ls = line.split("\\s+");
           for (int i = 1; i < ls.length; i++) {
             try {
-              Method qcam = QCAnalysis.class.getMethod(func, String.class, String.class, String.class);
+              Method qcam = this.getClass().getDeclaredMethod(func, String.class, String.class, String.class);
+              qcam.setAccessible(true);
               qcam.invoke(qcAnalysis, ls[0], headers[i], ls[i]);
             }
             catch (NoSuchMethodException e) {
@@ -290,11 +337,12 @@ public class FastQCReportParser implements QcReportParser<File> {
         if (first) {
           Matcher mS = moduleStartPattern.matcher(line);
           if (mS.matches()) {
+            log.info("Processing module block: " + line);
             moduleBlock.append(line);
             first = false;
           }
           else {
-            throw new QCAnalysisException("Module block to parse doesn't start with a suitable module start string");
+            throw new QCAnalysisException("Module block to parse doesn't start with a suitable module start string: '" + line + "'");
           }
         }
         else {

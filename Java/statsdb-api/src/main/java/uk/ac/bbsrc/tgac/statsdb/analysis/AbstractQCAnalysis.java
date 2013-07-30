@@ -16,15 +16,15 @@ import java.util.regex.Pattern;
  * @date 02/07/13
  * @since 1.0-SNAPSHOT
  */
-public class AbstractQCAnalysis implements QCAnalysis {
+public abstract class AbstractQCAnalysis implements QCAnalysis {
   private long id = 0L;
 
-  private Map<String,String> properties;
-  private Map<String,String> valueTypes;
-  private Map<String,String> valueDescriptions;
-  private Map<String,String> generalValues;
-  private List<PartitionValue> partitionValues;
-  private List<PositionValue> positionValues;
+  public Map<String,String> properties;
+  public Map<String,String> valueTypes;
+  public Map<String,String> valueDescriptions;
+  public Map<String,String> generalValues;
+  public List<PartitionValue> partitionValues;
+  public List<PositionValue> positionValues;
 
   private static final Pattern rangeSpan = Pattern.compile("([0-9]+)-([0-9]+)");
   private static final Pattern rangePoint = Pattern.compile("([0-9]+)");

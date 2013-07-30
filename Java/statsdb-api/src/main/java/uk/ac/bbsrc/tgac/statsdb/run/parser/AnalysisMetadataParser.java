@@ -12,8 +12,6 @@ import java.util.List;
  * uk.ac.bbsrc.tgac.qc.run.parser
  * <p/>
  * Parses the StatsDB analysis metadata file format and populates a QCAnalysis property map
- * <p/>
- * TYPE_OF_EXPERIMENT     PATH_TO_FASTQC  INSTRUMENT      CHMESTRY_VERSION        SOFTWARE_ON_INSTRUMENT_VERSION  CASAVA_VERION   RUN_FOLDER      SAMPLE_NAME     LANE
  *
  * @author Rob Davey
  * @date 03/07/13
