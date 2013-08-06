@@ -5,7 +5,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
-import org.springframework.jdbc.datasource.DriverManagerDataSource;
 import uk.ac.bbsrc.tgac.statsdb.analysis.DefaultQCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.analysis.PartitionValue;
 import uk.ac.bbsrc.tgac.statsdb.analysis.PositionValue;
@@ -14,7 +13,6 @@ import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.FastQCReportParser;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.QcReportParser;
 
-import javax.sql.DataSource;
 import java.io.File;
 import java.util.Map;
 
@@ -31,8 +29,6 @@ public class StatsDbApp {
   protected static final Logger log = LoggerFactory.getLogger(StatsDbApp.class);
 
   public static void main(String[] args) {
-    ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
-
     Options options = new Options();
 
     options.addOption("h", false, "Print this help");
@@ -106,8 +102,13 @@ public class StatsDbApp {
           if (!line.hasOption("t")) {
             //write stuff to the database
             log.info("Writing stuff to the database...");
+            ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
           }
         }
+      }
+      else {
+        log.error("No input file specified.");
+        System.exit(1);
       }
     }
     catch (ParseException e) {
