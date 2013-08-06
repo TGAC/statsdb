@@ -119,11 +119,9 @@ public class FastQCReportParser implements QcReportParser<File> {
               moduleName += StatsDBUtils.capitalise(s);
             }
             log.info("Attempting to parse module: " + moduleName);
-            //Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, FileInputStream.class, QCAnalysis.class);
             Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, String.class, QCAnalysis.class);
             parseMethod.setAccessible(true);
-            log.info("Calling " + parseMethod.toString() + " on: \n" + module);
-            //parseMethod.invoke(this, r, qcAnalysis);
+            log.debug("Calling " + parseMethod.toString() + " on: \n" + module);
             parseMethod.invoke(this, module, qcAnalysis);
           }
         }
@@ -161,7 +159,7 @@ public class FastQCReportParser implements QcReportParser<File> {
       if (!line.startsWith("#") && !line.startsWith(">>")) {
         String[] tokens = line.split("\\t");
         if (tokens.length == 2) {
-          log.info(tokens[0].trim() + " : " + tokens[1].trim());
+          log.debug(tokens[0].trim() + " : " + tokens[1].trim());
           if("Sequence length".equals(tokens[0])) {
             Map.Entry<Long, Long> range = AbstractQCAnalysis.parseRange(tokens[1]);
             qcAnalysis.addGeneralValue("general_min_length", String.valueOf(range.getKey()), null);
@@ -176,6 +174,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         }
       }
     }
+    log.info("OK");
   }
 
   private void parseBasicStatistics(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
@@ -261,6 +260,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         }
       }
     }
+    log.info("OK");
   }
 
   private void parseOverrepresentedSequences(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
@@ -282,6 +282,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         }
       }
     }
+    log.info("OK");
   }
 
   private void parseKmerContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
@@ -292,43 +293,43 @@ public class FastQCReportParser implements QcReportParser<File> {
 
   private void parsePartition(String module, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
     parseModuleBlock(module, qcAnalysis, prefix, "addPartitionValue");
+    log.info("OK");
   }
 
   private void parsePartition(FileInputStream r, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
     parseModuleBlock(getModuleBlock(r), qcAnalysis, prefix, "addPartitionValue");
+    log.info("OK");
   }
 
   private void parsePosition(String module, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
     parseModuleBlock(module, qcAnalysis, prefix, "addPositionValue");
+    log.info("OK");
   }
 
   private void parsePosition(FileInputStream r, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
     parseModuleBlock(getModuleBlock(r), qcAnalysis, prefix, "addPositionValue");
+    log.info("OK");
   }
 
   private void parseModuleBlock(String module, QCAnalysis qcAnalysis, String prefix, String func) throws QCAnalysisException {
     String[] headers = null;
     String[] lines = module.split("\\n");
     for (String line : lines) {
-      if (!line.startsWith(">>")) {
-        if (line.startsWith("#")) {
-          //header row
-          line = line.substring(1);
-          log.info("header: " + line);
-          String[] hs = line.split("\\t+");
-          headers = new String[hs.length];
-          if (hs.length == 2 && headerKeys.containsKey(hs[0])) {
-            qcAnalysis.addGeneralValue(headerKeys.get(hs[0]), hs[1], "");
-          }
-          else {
-            for (int i = 0; i < hs.length; i++) {
-              String token = hs[i];
-              token = token.replaceAll("\\s+", "_");
-              if (headerKeys.containsKey(token)) {
-                token = headerKeys.get(token);
-              }
-              headers[i] = prefix + "_" + token;
+      if (line.startsWith("#")) {
+        line = line.substring(1);
+        String[] hs = line.split("\\t+");
+        headers = new String[hs.length];
+        if (hs.length == 2 && headerKeys.containsKey(hs[0])) {
+          qcAnalysis.addGeneralValue(headerKeys.get(hs[0]), hs[1], "");
+        }
+        else {
+          for (int i = 0; i < hs.length; i++) {
+            String token = hs[i];
+            token = token.replaceAll("\\s+", "_");
+            if (headerKeys.containsKey(token)) {
+              token = headerKeys.get(token);
             }
+            headers[i] = prefix + "_" + token;
           }
         }
       }
@@ -389,7 +390,6 @@ public class FastQCReportParser implements QcReportParser<File> {
         if (first) {
           Matcher mS = moduleStartPattern.matcher(line);
           if (mS.matches()) {
-            log.info("Processing module block: " + line);
             moduleBlock.append(line);
             first = false;
           }
