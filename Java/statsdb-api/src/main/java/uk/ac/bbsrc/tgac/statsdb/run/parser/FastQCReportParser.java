@@ -122,7 +122,7 @@ public class FastQCReportParser implements QcReportParser<File> {
             //Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, FileInputStream.class, QCAnalysis.class);
             Method parseMethod = this.getClass().getDeclaredMethod("parse" + moduleName, String.class, QCAnalysis.class);
             parseMethod.setAccessible(true);
-            log.info("Calling " + parseMethod.toString());
+            log.info("Calling " + parseMethod.toString() + " on: \n" + module);
             //parseMethod.invoke(this, r, qcAnalysis);
             parseMethod.invoke(this, module, qcAnalysis);
           }
@@ -157,23 +157,21 @@ public class FastQCReportParser implements QcReportParser<File> {
   }
 
   private void parseBasicStatistics(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
-    //TODO regex not working
-    Pattern basicStatsPattern = Pattern.compile("^([A-z0-9]+\\s{0,1})\\t+(.*)$");
     for (String line : module.split("\\n")) {
-      if (!line.startsWith("#")) {
-        Matcher m = basicStatsPattern.matcher(line);
-        if (m.matches() && m.group(1) != null && m.group(2) != null) {
-          log.info(line);
-          if("Sequence length".equals(m.group(1))) {
-            Map.Entry<Long, Long> range = AbstractQCAnalysis.parseRange(m.group(2));
+      if (!line.startsWith("#") && !line.startsWith(">>")) {
+        String[] tokens = line.split("\\t");
+        if (tokens.length == 2) {
+          log.info(tokens[0].trim() + " : " + tokens[1].trim());
+          if("Sequence length".equals(tokens[0])) {
+            Map.Entry<Long, Long> range = AbstractQCAnalysis.parseRange(tokens[1]);
             qcAnalysis.addGeneralValue("general_min_length", String.valueOf(range.getKey()), null);
             qcAnalysis.addGeneralValue("general_max_length", String.valueOf(range.getValue()), null);
           }
-          else if (valueKeys.containsKey(m.group(1))) {
-            qcAnalysis.addGeneralValue(valueKeys.get(m.group(1)), m.group(2), null);
+          else if (valueKeys.containsKey(tokens[0])) {
+            qcAnalysis.addGeneralValue(valueKeys.get(tokens[0]), tokens[1], null);
           }
           else {
-            qcAnalysis.addProperty(m.group(1), m.group(2));
+            qcAnalysis.addProperty(tokens[0], tokens[1]);
           }
         }
       }
@@ -182,49 +180,78 @@ public class FastQCReportParser implements QcReportParser<File> {
 
   private void parseBasicStatistics(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     log.info(""+r.getChannel().position());
-    Pattern basicStatsPattern = Pattern.compile("([\\S| ]+)\\s+([\\S| ]+)");
     String module = getModuleBlock(r);
     parseBasicStatistics(module, qcAnalysis);
+  }
+
+  private void parsePerBaseSequenceQuality(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "quality");
   }
 
   private void parsePerBaseSequenceQuality(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "quality");
   }
 
+  private void parsePerSequenceQualityScores(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePosition(module, qcAnalysis, "quality_score");
+  }
+
   private void parsePerSequenceQualityScores(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePosition(r, qcAnalysis, "quality_score");
+  }
+
+  private void parsePerBaseSequenceContent(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "base_content");
   }
 
   private void parsePerBaseSequenceContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "base_content");
   }
 
+  private void parsePerBaseGCContent(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "gc_content");
+  }
+
   private void parsePerBaseGCContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "gc_content");
+  }
+
+  private void parsePerSequenceGCContent(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "gc_content");
   }
 
   private void parsePerSequenceGCContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "gc_content");
   }
 
+  private void parsePerBaseNContent(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "base_content");
+  }
+
   private void parsePerBaseNContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "base_content");
+  }
+
+  private void parseSequenceLengthDistribution(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePartition(module, qcAnalysis, "sequence_length");
   }
 
   private void parseSequenceLengthDistribution(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePartition(r, qcAnalysis, "sequence_length");
   }
 
+  private void parseSequenceDuplicationLevels(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    parsePosition(module, qcAnalysis, "duplication_level");
+  }
+
   private void parseSequenceDuplicationLevels(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
     parsePosition(r, qcAnalysis, "duplication_level");
   }
 
-  private void parseOverrepresentedSequences(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
-    String s = getModuleBlock(r);
-    for (String line : s.split("\\n")) {
-      if (!line.startsWith("#")) {
-        //split on whitespace that's two or more characters. this should catch tabs and non-intra-word spaces
-        String[] tokens = line.split("\\s\\s+");
+  private void parseOverrepresentedSequences(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    for (String line : module.split("\\n")) {
+      if (!line.startsWith("#") && !line.startsWith(">>") && !"".equals(line)) {
+        String[] tokens = line.split("\\t+");
         if (tokens.length >= 4) {
           values.put(tokens[0], "overrepresented_sequence");
           qcAnalysis.addGeneralValue(tokens[0], tokens[1], tokens[3]);
@@ -236,12 +263,16 @@ public class FastQCReportParser implements QcReportParser<File> {
     }
   }
 
-  private void parseKmerContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
-    String s = getModuleBlock(r);
-    for (String line : s.split("\\n")) {
-      if (!line.startsWith("#")) {
-        //split on whitespace that's two or more characters. this should catch tabs and non-intra-word spaces
-        String[] tokens = line.split("\\s\\s+");
+  private void parseOverrepresentedSequences(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    log.info(""+r.getChannel().position());
+    String module = getModuleBlock(r);
+    parseOverrepresentedSequences(module, qcAnalysis);
+  }
+
+  private void parseKmerContent(String module, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    for (String line : module.split("\\n")) {
+      if (!line.startsWith("#") && !line.startsWith(">>") && !"".equals(line)) {
+        String[] tokens = line.split("\\t+");
         if (tokens.length >= 2) {
           values.put(tokens[0], "overrepresented_kmer");
           qcAnalysis.addGeneralValue(tokens[0], tokens[1], null);
@@ -253,8 +284,22 @@ public class FastQCReportParser implements QcReportParser<File> {
     }
   }
 
+  private void parseKmerContent(FileInputStream r, QCAnalysis qcAnalysis) throws IOException, QCAnalysisException {
+    log.info(""+r.getChannel().position());
+    String module = getModuleBlock(r);
+    parseKmerContent(module, qcAnalysis);
+  }
+
+  private void parsePartition(String module, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
+    parseModuleBlock(module, qcAnalysis, prefix, "addPartitionValue");
+  }
+
   private void parsePartition(FileInputStream r, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
     parseModuleBlock(getModuleBlock(r), qcAnalysis, prefix, "addPartitionValue");
+  }
+
+  private void parsePosition(String module, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
+    parseModuleBlock(module, qcAnalysis, prefix, "addPositionValue");
   }
 
   private void parsePosition(FileInputStream r, QCAnalysis qcAnalysis, String prefix) throws IOException, QCAnalysisException {
@@ -263,31 +308,38 @@ public class FastQCReportParser implements QcReportParser<File> {
 
   private void parseModuleBlock(String module, QCAnalysis qcAnalysis, String prefix, String func) throws QCAnalysisException {
     String[] headers = null;
-    for (String line : module.split("\\n")) {
-      if (line.startsWith("#")) {
-        //header row
-        line = line.substring(1);
-        String[] hs = line.split("\\s+");
-        headers = new String[hs.length];
-        if (hs.length == 2 && headerKeys.containsKey(hs[0])) {
-          qcAnalysis.addGeneralValue(headerKeys.get(hs[0]), hs[1], "");
-        }
-        else {
-          for (int i = 0; i < hs.length; i++) {
-            String token = hs[i];
-            token = token.replaceAll("\\s+", "_");
-            if (headerKeys.containsKey(token)) {
-              token = headerKeys.get(token);
+    String[] lines = module.split("\\n");
+    for (String line : lines) {
+      if (!line.startsWith(">>")) {
+        if (line.startsWith("#")) {
+          //header row
+          line = line.substring(1);
+          log.info("header: " + line);
+          String[] hs = line.split("\\t+");
+          headers = new String[hs.length];
+          if (hs.length == 2 && headerKeys.containsKey(hs[0])) {
+            qcAnalysis.addGeneralValue(headerKeys.get(hs[0]), hs[1], "");
+          }
+          else {
+            for (int i = 0; i < hs.length; i++) {
+              String token = hs[i];
+              token = token.replaceAll("\\s+", "_");
+              if (headerKeys.containsKey(token)) {
+                token = headerKeys.get(token);
+              }
+              headers[i] = prefix + "_" + token;
             }
-            headers[i] = prefix + "_" + token;
           }
         }
       }
-      else {
-        if (headers == null) {
-          throw new QCAnalysisException("Something went wrong with header row parsing. Failing...");
-        }
+    }
 
+    if (headers == null) {
+      throw new QCAnalysisException("Something went wrong with header row parsing. Failing...");
+    }
+
+    for (String line : lines) {
+      if (!line.startsWith(">>") && !line.startsWith("#")) {
         if (lineFunctions.containsKey(func)) {
           try {
             Method qcam = this.getClass().getDeclaredMethod(func, QCAnalysis.class, String.class);
@@ -305,10 +357,10 @@ public class FastQCReportParser implements QcReportParser<File> {
           }
         }
         else {
-          String[] ls = line.split("\\s+");
+          String[] ls = line.split("\\t+");
           for (int i = 1; i < ls.length; i++) {
             try {
-              Method qcam = this.getClass().getDeclaredMethod(func, String.class, String.class, String.class);
+              Method qcam = QCAnalysis.class.getDeclaredMethod(func, String.class, String.class, String.class);
               qcam.setAccessible(true);
               qcam.invoke(qcAnalysis, ls[0], headers[i], ls[i]);
             }

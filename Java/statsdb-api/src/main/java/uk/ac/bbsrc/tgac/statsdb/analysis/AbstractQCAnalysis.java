@@ -5,6 +5,7 @@ import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 import java.util.AbstractMap;
 import java.util.List;
 import java.util.Map;
+import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
@@ -62,8 +63,8 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
 
   @Override
   public void addPositionValue(String position, String key, String value) throws QCAnalysisException {
-    if (position != null && position.matches("[\\d+]")) {
-      PositionValue pv = new PositionValue(Long.parseLong(position), key, value);
+    if (position != null && position.matches("[\\d\\+]+")) {
+      PositionValue pv = new PositionValue(Long.parseLong(position.replaceAll("\\+", "")), key, value);
       positionValues.add(pv);
     }
     else {
@@ -117,9 +118,10 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
     if (range != null) {
       long min = 0L;
       long max = 0L;
-      if (rangeSpan.matcher(range).matches()) {
-        min = Long.parseLong(rangeSpan.matcher(range).group(1));
-        max = Long.parseLong(rangeSpan.matcher(range).group(2));
+      Matcher m = rangeSpan.matcher(range);
+      if (m.matches()) {
+        min = Long.parseLong(m.group(1));
+        max = Long.parseLong(m.group(2));
       }
       else if (rangePoint.matcher(range).matches()) {
         min = max = Long.parseLong(range);
