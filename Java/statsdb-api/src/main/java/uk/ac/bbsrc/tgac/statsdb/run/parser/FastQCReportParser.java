@@ -69,7 +69,7 @@ public class FastQCReportParser implements QcReportParser<File> {
     valueKeys.put("Filtered Sequences", "general_filtered_sequences");
     valueKeys.put("%GC", "general_gc_content");
 
-    headerKeys.put("%GC", "percentage");
+    headerKeys.put("%gc", "percentage");
     headerKeys.put("n-count", "n_percentage");
 
     lineFunctions.put("parseOverrepresentedSequences", "1");
@@ -253,6 +253,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         String[] tokens = line.split("\\t+");
         if (tokens.length >= 4) {
           values.put(tokens[0], "overrepresented_sequence");
+          qcAnalysis.addValueType(tokens[0], "overrepresented_sequence");
           qcAnalysis.addGeneralValue(tokens[0], tokens[1], tokens[3]);
         }
         else {
@@ -275,6 +276,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         String[] tokens = line.split("\\t+");
         if (tokens.length >= 2) {
           values.put(tokens[0], "overrepresented_kmer");
+          qcAnalysis.addValueType(tokens[0], "overrepresented_kmer");
           qcAnalysis.addGeneralValue(tokens[0], tokens[1], null);
         }
         else {
@@ -316,7 +318,7 @@ public class FastQCReportParser implements QcReportParser<File> {
     String[] lines = module.split("\\n");
     for (String line : lines) {
       if (line.startsWith("#")) {
-        line = line.substring(1);
+        line = line.substring(1).toLowerCase();
         String[] hs = line.split("\\t+");
         headers = new String[hs.length];
         if (hs.length == 2 && headerKeys.containsKey(hs[0])) {

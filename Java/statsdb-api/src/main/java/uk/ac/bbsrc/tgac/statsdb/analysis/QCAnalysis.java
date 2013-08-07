@@ -16,12 +16,14 @@ import java.util.Map;
  */
 public interface QCAnalysis {
   public long getId();
+  public void setId(long id);
   public String getProperty(String key) throws QCAnalysisException;
   public void addProperty(String key, String value) throws QCAnalysisException;
   public void addPartitionValue(String range, String key, String value) throws QCAnalysisException;
   public void addPositionValue(String position, String key, String value) throws QCAnalysisException;
   public void addGeneralValue(String valueType, String valueScope, String descriptor) throws QCAnalysisException;
   public void addValueType(String valueTypeKey, String valueScope) throws QCAnalysisException;
+  public Map<String, String> getProperties();
   public Map<String,String> getGeneralValues();
   public List<PartitionValue> getPartitionValues();
   public List<PositionValue> getPositionValues();

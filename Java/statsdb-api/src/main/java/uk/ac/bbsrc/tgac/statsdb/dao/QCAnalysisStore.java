@@ -2,6 +2,7 @@ package uk.ac.bbsrc.tgac.statsdb.dao;
 
 import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.util.VerbosityAware;
 
 /**
  * uk.ac.bbsrc.tgac.qc.dao
@@ -12,7 +13,7 @@ import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
  * @date 02/07/13
  * @since 1.0-SNAPSHOT
  */
-public interface QCAnalysisStore {
+public interface QCAnalysisStore extends VerbosityAware {
   public void insertAnalysis(QCAnalysis analysis) throws QCAnalysisException;
   public void insertValues(QCAnalysis analysis) throws QCAnalysisException;
   public void insertProperties(QCAnalysis analysis) throws QCAnalysisException;

@@ -90,6 +90,11 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
   }
 
   @Override
+  public Map<String,String> getProperties() {
+    return properties;
+  }
+
+  @Override
   public Map<String,String> getGeneralValues() {
     return generalValues;
   }

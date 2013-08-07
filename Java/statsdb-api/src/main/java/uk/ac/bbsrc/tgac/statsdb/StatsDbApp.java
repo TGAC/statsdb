@@ -5,10 +5,12 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationContext;
 import org.springframework.context.support.ClassPathXmlApplicationContext;
+import org.springframework.dao.DataAccessException;
 import uk.ac.bbsrc.tgac.statsdb.analysis.DefaultQCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.analysis.PartitionValue;
 import uk.ac.bbsrc.tgac.statsdb.analysis.PositionValue;
 import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
+import uk.ac.bbsrc.tgac.statsdb.dao.QCAnalysisStore;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.FastQCReportParser;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.QcReportParser;
@@ -83,26 +85,44 @@ public class StatsDbApp {
           qcParser.parseReport(inputfile, qca);
 
           if (line.hasOption("v")) {
-            log.info("Position values:");
-            for (PositionValue p : qca.getPositionValues()) {
-              log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition());
+            log.info("Parsed general values:");
+            for (Map.Entry<String, String> p : qca.getGeneralValues().entrySet()) {
+              log.info("\t\\_ " + p.getKey()+":"+p.getValue());
             }
 
-            log.info("Partition values:");
+            log.info("Parsed partition values:");
             for (PartitionValue p : qca.getPartitionValues()) {
               log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition()+":"+p.getSize());
             }
 
-            log.info("General values:");
-            for (Map.Entry<String, String> p : qca.getGeneralValues().entrySet()) {
-              log.info("\t\\_ " + p.getKey()+":"+p.getValue());
+            log.info("Parsed position values:");
+            for (PositionValue p : qca.getPositionValues()) {
+              log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition());
             }
           }
 
           if (!line.hasOption("t")) {
             //write stuff to the database
-            log.info("Writing stuff to the database...");
-            ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
+            log.info("Writing analysis report to the database:");
+            try {
+              ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
+              QCAnalysisStore store = (QCAnalysisStore)context.getBean("qcAnalysisStore");
+              if (line.hasOption("v")) {
+                store.setVerbose(true);
+              }
+              store.insertAnalysis(qca);
+              log.info("SUCCESS");
+            }
+            catch (QCAnalysisException e) {
+              log.error("FAIL: Cannot insert analysis into the database: " + e.getMessage());
+              e.printStackTrace();
+              System.exit(1);
+            }
+            catch (DataAccessException e) {
+              log.error("FAIL: Error inserting analysis into the database: " + e.getMessage());
+              e.printStackTrace();
+              System.exit(1);
+            }
           }
         }
       }
