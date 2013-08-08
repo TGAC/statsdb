@@ -61,10 +61,12 @@ public class GenericReportTable implements ReportTable {
     }
   }
 
+  @Override
   public String toCSV() {
     return this.toCSV(',');
   }
 
+  @Override
   public String toCSV(char separator) {
     StringBuilder buff = new StringBuilder();
     for (List<? extends Serializable> arr : table) {
@@ -78,11 +80,13 @@ public class GenericReportTable implements ReportTable {
     return buff.toString();
   }
 
+  @Override
   public String toJSON() throws IOException {
     ObjectMapper mapper = new ObjectMapper();
     return mapper.writeValueAsString(table);
   }
 
+  @Override
   public List<String> getHeaders() {
     List<? extends Serializable> headers = table.get(0);
     List<String> l = new LinkedList<String>();
@@ -92,6 +96,7 @@ public class GenericReportTable implements ReportTable {
     return l;
   }
 
+  @Override
   public List<List<String>> getTable() {
     return new ArrayList<List<String>>(table);
   }

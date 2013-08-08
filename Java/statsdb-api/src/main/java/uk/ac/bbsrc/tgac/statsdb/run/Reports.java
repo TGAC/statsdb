@@ -1,5 +1,7 @@
 package uk.ac.bbsrc.tgac.statsdb.run;
 
+import org.springframework.jdbc.core.JdbcTemplate;
+
 import javax.sql.DataSource;
 import java.sql.*;
 import java.util.ArrayList;
@@ -7,8 +9,18 @@ import java.util.List;
 import java.util.Map;
 
 public class Reports {
-  Connection connection;
-  DataSource dataSource = null;
+  private Connection connection;
+  private DataSource dataSource = null;
+  private JdbcTemplate template = null;
+
+  /**
+   * Create a Reports object with a Spring JdbcTemplate.
+   *
+   * @param template
+   */
+  public Reports(JdbcTemplate template) {
+    this.template = template;
+  }
 
   /**
    * Create a Reports object with a connection. For development outside a container.
@@ -37,7 +49,10 @@ public class Reports {
    * @throws SQLException
    */
   private Connection getConnection() throws SQLException {
-    if (dataSource != null) {
+    if (template != null) {
+      return template.getDataSource().getConnection();
+    }
+    else if (dataSource != null) {
       return dataSource.getConnection();
     }
     return connection;

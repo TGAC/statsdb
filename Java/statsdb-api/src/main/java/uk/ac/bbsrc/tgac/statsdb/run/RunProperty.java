@@ -5,7 +5,6 @@ package uk.ac.bbsrc.tgac.statsdb.run;
  * User: ramirezr
  * Date: 09/03/2012
  * Time: 14:01
- * To change this template use File | Settings | File Templates.
  */
 public enum RunProperty {
   encoding,
