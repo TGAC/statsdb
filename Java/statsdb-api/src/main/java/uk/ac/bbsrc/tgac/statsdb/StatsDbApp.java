@@ -12,10 +12,13 @@ import uk.ac.bbsrc.tgac.statsdb.analysis.PositionValue;
 import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.dao.QCAnalysisStore;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
+import uk.ac.bbsrc.tgac.statsdb.run.parser.AnalysisMetadataParser;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.FastQCReportParser;
 import uk.ac.bbsrc.tgac.statsdb.run.parser.QcReportParser;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,21 +40,27 @@ public class StatsDbApp {
     options.addOption("t", false, "Test mode. Doesn't write anything to the database.");
     options.addOption("v", false, "Verbose mode. Use if you like lots of tasty output.");
 
+    Option metadataFileOption = OptionBuilder.withArgName("file")
+        .hasArg()
+        .withDescription("Process multiple reports using a StatsDB metadata table file")
+        .create("m");
+    options.addOption(metadataFileOption);
+
     Option inputFileOption = OptionBuilder.withArgName("file")
         .hasArg()
-        .withDescription("use given input file")
+        .withDescription("Use given input report file")
         .create("f");
     options.addOption(inputFileOption);
 
     Option parserTypeOption = OptionBuilder.withArgName("fastqc,other")
         .hasArg()
-        .withDescription("use specified parser type")
+        .withDescription("Use specified parser type")
         .create("p");
     options.addOption(parserTypeOption);
 
     Option runNameOption = OptionBuilder.withArgName("run")
         .hasArg()
-        .withDescription("associate the report with a given run name")
+        .withDescription("Associate the report with a given run name")
         .create("r");
     options.addOption(runNameOption);
 
@@ -80,10 +89,38 @@ public class StatsDbApp {
         qcParser = new FastQCReportParser();
       }
 
-      if (line.hasOption("f")) {
+      List<QCAnalysis> qcas = new ArrayList<>();
+
+      if (line.hasOption("m")) {
+        File inputfile = new File(line.getOptionValue("m"));
+        if (!inputfile.exists()) {
+          log.error("No input metadata file specified.");
+          System.exit(1);
+        }
+        else {
+          AnalysisMetadataParser amp = new AnalysisMetadataParser();
+          List<QCAnalysis> pqcas = amp.parseMetadataFile(inputfile);
+          for (QCAnalysis pqca : pqcas) {
+            try {
+              String path = pqca.getProperty("path_to_analysis");
+              File reportFileToParse = new File(path);
+              if (reportFileToParse.exists()) {
+                qcParser.parseReport(reportFileToParse, pqca);
+              }
+            }
+            catch (QCAnalysisException e) {
+              log.error("Cannot use metadata file - no property 'path_to_analysis' available. For each report line, this " +
+                        "should point to the file path where the report file is located.");
+              System.exit(1);
+            }
+          }
+          qcas.addAll(pqcas);
+        }
+      }
+      else if (line.hasOption("f")) {
         File inputfile = new File(line.getOptionValue("f"));
         if (!inputfile.exists()) {
-          log.error("No input file specified.");
+          log.error("No input report file specified.");
           System.exit(1);
         }
         else {
@@ -95,54 +132,56 @@ public class StatsDbApp {
           else {
             log.warn("No run name specified. Parsed report metrics will only be queryable on raw read filename.");
           }
-
           qcParser.parseReport(inputfile, qca);
-
-          if (line.hasOption("v")) {
-            log.info("Parsed general values:");
-            for (Map.Entry<String, String> p : qca.getGeneralValues().entrySet()) {
-              log.info("\t\\_ " + p.getKey()+":"+p.getValue());
-            }
-
-            log.info("Parsed partition values:");
-            for (PartitionValue p : qca.getPartitionValues()) {
-              log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition()+":"+p.getSize());
-            }
-
-            log.info("Parsed position values:");
-            for (PositionValue p : qca.getPositionValues()) {
-              log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition());
-            }
-          }
-
-          if (!line.hasOption("t")) {
-            //write stuff to the database
-            log.info("Writing analysis report to the database:");
-            try {
-              ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
-              QCAnalysisStore store = (QCAnalysisStore)context.getBean("qcAnalysisStore");
-              if (line.hasOption("v")) {
-                store.setVerbose(true);
-              }
-              store.insertAnalysis(qca);
-              log.info("SUCCESS");
-            }
-            catch (QCAnalysisException e) {
-              log.error("FAIL: Cannot insert analysis into the database: " + e.getMessage());
-              e.printStackTrace();
-              System.exit(1);
-            }
-            catch (DataAccessException e) {
-              log.error("FAIL: Error inserting analysis into the database: " + e.getMessage());
-              e.printStackTrace();
-              System.exit(1);
-            }
-          }
+          qcas.add(qca);
         }
       }
       else {
-        log.error("No input file specified.");
+        log.error("No input metadata or report file specified.");
         System.exit(1);
+      }
+
+      for (QCAnalysis qca : qcas) {
+        if (line.hasOption("v")) {
+          log.info("Parsed general values:");
+          for (Map.Entry<String, String> p : qca.getGeneralValues().entrySet()) {
+            log.info("\t\\_ " + p.getKey()+":"+p.getValue());
+          }
+
+          log.info("Parsed partition values:");
+          for (PartitionValue p : qca.getPartitionValues()) {
+            log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition()+":"+p.getSize());
+          }
+
+          log.info("Parsed position values:");
+          for (PositionValue p : qca.getPositionValues()) {
+            log.info("\t\\_ " + p.getKey()+":"+p.getValue()+":"+p.getPosition());
+          }
+        }
+
+        if (!line.hasOption("t")) {
+          //write stuff to the database
+          log.info("Writing analysis report to the database:");
+          try {
+            ApplicationContext context = new ClassPathXmlApplicationContext("db-config.xml");
+            QCAnalysisStore store = (QCAnalysisStore)context.getBean("qcAnalysisStore");
+            if (line.hasOption("v")) {
+              store.setVerbose(true);
+            }
+            store.insertAnalysis(qca);
+            log.info("SUCCESS");
+          }
+          catch (QCAnalysisException e) {
+            log.error("FAIL: Cannot insert analysis into the database: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+          }
+          catch (DataAccessException e) {
+            log.error("FAIL: Error inserting analysis into the database: " + e.getMessage());
+            e.printStackTrace();
+            System.exit(1);
+          }
+        }
       }
     }
     catch (ParseException e) {
