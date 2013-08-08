@@ -22,9 +22,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * uk.ac.bbsrc.tgac.statsdb
- * <p/>
- * Info
+ * Main StatsDB CLI application. This is able to parse metadata and report files and insert data into the database. A
+ * testing mode is also available (supply the '-t' flag) whereby no data is inserted.
  *
  * @author Rob Davey
  * @date 06/08/13
