@@ -3,9 +3,7 @@ package uk.ac.bbsrc.tgac.statsdb.analysis;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 /**
- * uk.ac.bbsrc.tgac.qc.analysis
- * <p/>
- * Info
+ * A value class that represents a partionable number, i.e. a range, alongside a given key:value description of that metric
  *
  * @author Rob Davey
  * @date 02/07/13
@@ -22,22 +20,42 @@ public class PartitionValue {
     this.size = size;
     if (key == null || "".equals(key)) { throw new QCAnalysisException("A partition value cannot have a null or empty key"); }
     this.key = key;
-    if (value == null || "".equals(value)) { throw new QCAnalysisException("A parition value cannot have a null or empty value"); }
+    if (value == null || "".equals(value)) { throw new QCAnalysisException("A partition value cannot have a null or empty value"); }
     this.value = value;
   }
 
+  /**
+   * Get the partition range start position value
+   *
+   * @return the range position
+   */
   public long getPosition() {
     return this.position;
   }
 
+  /**
+   * Get the size of the partition range
+   *
+   * @return the range size
+   */
   public long getSize() {
     return this.size;
   }
 
+  /**
+   * Get the value description key
+   *
+   * @return description key string
+   */
   public String getKey() {
     return this.key;
   }
 
+  /**
+   * Get the value description value
+   *
+   * @return description value string
+   */
   public String getValue() {
     return this.value;
   }

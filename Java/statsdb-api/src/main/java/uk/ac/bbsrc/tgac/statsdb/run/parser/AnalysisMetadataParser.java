@@ -9,8 +9,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * uk.ac.bbsrc.tgac.qc.run.parser
- * <p/>
  * Parses the StatsDB analysis metadata file format and populates a QCAnalysis property map
  *
  * @author Rob Davey
@@ -18,6 +16,14 @@ import java.util.List;
  * @since 1.0-SNAPSHOT
  */
 public class AnalysisMetadataParser {
+  /**
+   * Parse a StatsDB analysis metadata file, create relevant QCAnalysis objects and populate the relevant properties
+   * in said QCAnalysis objects
+   *
+   * @param file to parse as a Java File object
+   * @return a List of QCAnalysis objects created from the metadata file
+   * @throws QCAnalysisException
+   */
   public List<QCAnalysis> parseMetadataFile(File file) throws QCAnalysisException {
     List<QCAnalysis> qcas = new ArrayList<>();
     try {
@@ -30,6 +36,14 @@ public class AnalysisMetadataParser {
     return qcas;
   }
 
+  /**
+   * Parse a StatsDB analysis metadata file, create relevant QCAnalysis objects and populate the relevant properties
+   * in said QCAnalysis objects
+   *
+   * @param csv to parse as a CSV text file string
+   * @return a List of QCAnalysis objects created from the metadata file
+   * @throws QCAnalysisException
+   */
   public List<QCAnalysis> parseMetadataFile(String csv) throws QCAnalysisException {
     List<QCAnalysis> qcas = new ArrayList<>();
     Reader r = new StringReader(csv);

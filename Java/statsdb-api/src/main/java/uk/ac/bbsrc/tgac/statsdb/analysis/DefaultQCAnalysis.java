@@ -4,9 +4,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 /**
- * uk.ac.bbsrc.tgac.qc.analysis
- * <p/>
- * Info
+ * Default implementation of a QCAnalysis
  *
  * @author Rob Davey
  * @date 03/07/13

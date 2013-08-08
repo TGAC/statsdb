@@ -5,9 +5,10 @@ import uk.ac.bbsrc.tgac.statsdb.analysis.QCAnalysis;
 import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
 
 /**
- * uk.ac.bbsrc.tgac.qc.run.parser
- * <p/>
- * Interface defining contract to parse the output of a QC application into the StatsDB
+ * Interface defining contract to parse the output of a QC application into the StatsDB QCAnalysis data type.
+ *
+ * This interface is marked with the @Spi annotation, meaning it can be resolved at runtime by the ServiceLoader
+ * architecture.
  *
  * @author Rob Davey
  * @date 01/07/13
@@ -15,5 +16,11 @@ import uk.ac.bbsrc.tgac.statsdb.exception.QCAnalysisException;
  */
 @Spi
 public interface QcReportParser<T> {
+  /**
+   * Parse a report of type T, populating a given QCAnalysis object properties and values
+   * @param in object of type T
+   * @param qcAnalysis to populate with report contents
+   * @throws QCAnalysisException when the report could not be parsed
+   */
   void parseReport(T in, QCAnalysis qcAnalysis) throws QCAnalysisException;
 }

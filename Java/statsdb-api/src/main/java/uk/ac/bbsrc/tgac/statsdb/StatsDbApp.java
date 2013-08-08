@@ -49,13 +49,19 @@ public class StatsDbApp {
         .create("p");
     options.addOption(parserTypeOption);
 
+    Option runNameOption = OptionBuilder.withArgName("run")
+        .hasArg()
+        .withDescription("associate the report with a given run name")
+        .create("r");
+    options.addOption(runNameOption);
+
     CommandLineParser parser = new BasicParser();
     try {
       CommandLine line = parser.parse(options, args);
 
       if (line.hasOption("h")) {
         HelpFormatter formatter = new HelpFormatter();
-        formatter.printHelp( "statsdb.jar", options );
+        formatter.printHelp("statsdb.jar", options);
       }
 
       QcReportParser<File> qcParser = null;
@@ -82,6 +88,14 @@ public class StatsDbApp {
         }
         else {
           QCAnalysis qca = new DefaultQCAnalysis();
+
+          if (line.hasOption("r")) {
+            qca.addProperty("run", line.getOptionValue("r"));
+          }
+          else {
+            log.warn("No run name specified. Parsed report metrics will only be queryable on raw read filename.");
+          }
+
           qcParser.parseReport(inputfile, qca);
 
           if (line.hasOption("v")) {

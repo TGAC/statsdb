@@ -1,7 +1,8 @@
 package uk.ac.bbsrc.tgac.statsdb.run;
 
 /**
- * Created by IntelliJ IDEA.
+ * Enum representing
+ *
  * User: ramirezr
  * Date: 09/03/2012
  * Time: 14:01

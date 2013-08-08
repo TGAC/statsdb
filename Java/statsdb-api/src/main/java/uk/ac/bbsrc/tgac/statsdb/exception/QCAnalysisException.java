@@ -1,9 +1,7 @@
 package uk.ac.bbsrc.tgac.statsdb.exception;
 
 /**
- * uk.ac.bbsrc.tgac.qc.exception
- * <p/>
- * Info
+ * Exception type
  *
  * @author Rob Davey
  * @date 02/07/13

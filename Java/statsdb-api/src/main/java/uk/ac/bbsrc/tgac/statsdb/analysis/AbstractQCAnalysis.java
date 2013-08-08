@@ -11,7 +11,8 @@ import java.util.regex.Pattern;
 /**
  * uk.ac.bbsrc.tgac.qc.analysis
  * <p/>
- * Info
+ * Skeleton implementation of a QCAnalysis object. Contains default methods for storing and retrieving QC report
+ * metrics.
  *
  * @author Rob Davey
  * @date 02/07/13
@@ -27,9 +28,17 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
   public List<PartitionValue> partitionValues;
   public List<PositionValue> positionValues;
 
+  /**
+   * Regular expression representing a valid range string
+   */
   private static final Pattern rangeSpan = Pattern.compile("([0-9]+)-([0-9]+)");
+
+  /**
+   * Regular expression representing a valid point number
+   */
   private static final Pattern rangePoint = Pattern.compile("([0-9]+)");
 
+  @Override
   public void setId(long id) {
     this.id = id;
   }
@@ -85,6 +94,7 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
     valueTypes.put(valueTypeKey, valueScope);
   }
 
+  @Override
   public void addValueDescription(String valueTypeKey, String description) throws QCAnalysisException {
     valueDescriptions.put(valueTypeKey, description);
   }
@@ -119,6 +129,16 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
     return valueDescriptions;
   }
 
+
+  /**
+   * Convert a string object representing a range of numbers separated by a hyphen into two numbers
+   *
+   * @param range
+   * @return A pair (Map.Entry) representing the min and max bounds of a given range string, e.g. 32-142
+   * results in min=32, max=142
+   *
+   * @throws QCAnalysisException when a null range is passed to this method, or when the input string is an invalid range string
+   */
   public static Map.Entry<Long, Long> parseRange(String range) throws QCAnalysisException {
     if (range != null) {
       long min = 0L;
@@ -131,6 +151,9 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
       else if (rangePoint.matcher(range).matches()) {
         min = max = Long.parseLong(range);
       }
+      else {
+        throw new QCAnalysisException("Invalid range string '"+range+"'. Needs to be of the form 'a-b'");
+      }
       return new AbstractMap.SimpleImmutableEntry<>(min, max);
     }
     else {
@@ -138,6 +161,13 @@ public abstract class AbstractQCAnalysis implements QCAnalysis {
     }
   }
 
+  /**
+   * Parses a given range string to produce the size of the difference between the min and max values
+   *
+   * @param range
+   * @return A pair (Map.Entry) representing the min value and the size of the range
+   * @throws QCAnalysisException
+   */
   public static Map.Entry<String, String> rangeToSize(String range) throws QCAnalysisException {
     Map.Entry<Long, Long> kv = parseRange(range);
     long from = kv.getKey();

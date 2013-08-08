@@ -37,10 +37,20 @@ public class QCAnalysisDAO implements QCAnalysisStore {
   private static final String VALUE_TYPE_SELECT =
       "SELECT id FROM value_type WHERE type_scope_id= ? AND description= ?";
 
+  /**
+   * Get the JdbcTemplate associated with this data access object
+   *
+   * @return the template
+   */
   public JdbcTemplate getJdbcTemplate() {
     return template;
   }
 
+  /**
+   * Sets the JdbcTemplate to use for this data access object
+   *
+   * @param template
+   */
   public void setJdbcTemplate(JdbcTemplate template) {
     this.template = template;
   }
