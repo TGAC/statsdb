@@ -41,6 +41,15 @@
     </plugins>
   </build>
 
+  <repositories>
+    <!-- Fluxion tools -->
+    <repository>
+      <id>hasbanana-repo</id>
+      <name>hasbanana Maven Repository</name>
+      <url>http://www.hasbanana.com/maven/repo</url>
+    </repository>
+  </repositories>
+
   <dependencies>
     <dependency>
       <groupId>mysql</groupId>
