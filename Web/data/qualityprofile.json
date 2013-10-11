@@ -1,0 +1,238 @@
+{
+    "stats": [
+        {
+            "base": "1",
+            "mean": "33.706393478706616",
+            "median": "34.0",
+            "lowerquartile": "33.0",
+            "upperquartile": "34.333333333333336",
+            "tenthpercentile": "32.333333333333336",
+            "ninetiethpercentile": "35.0"
+        },
+        {
+            "base": "2",
+            "mean": "33.86913865247116",
+            "median": "34.0",
+            "lowerquartile": "33.333333333333336",
+            "upperquartile": "34.666666666666664",
+            "tenthpercentile": "32.666666666666664",
+            "ninetiethpercentile": "35.333333333333336"
+        },
+        {
+            "base": "3",
+            "mean": "33.92341994527016",
+            "median": "34.0",
+            "lowerquartile": "33.333333333333336",
+            "upperquartile": "34.666666666666664",
+            "tenthpercentile": "32.666666666666664",
+            "ninetiethpercentile": "35.333333333333336"
+        },
+        {
+            "base": "4",
+            "mean": "33.94828410341822",
+            "median": "34.0",
+            "lowerquartile": "33.333333333333336",
+            "upperquartile": "35.0",
+            "tenthpercentile": "33.0",
+            "ninetiethpercentile": "35.333333333333336"
+        },
+        {
+            "base": "5",
+            "mean": "33.88599442126535",
+            "median": "34.0",
+            "lowerquartile": "33.333333333333336",
+            "upperquartile": "34.666666666666664",
+            "tenthpercentile": "32.666666666666664",
+            "ninetiethpercentile": "35.333333333333336"
+        },
+        {
+            "base": "6",
+            "mean": "35.72567329234371",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "7",
+            "mean": "35.72063285457645",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "8",
+            "mean": "35.70517887571931",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "9",
+            "mean": "35.71634822382129",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "10",
+            "mean": "35.72061342198438",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "11",
+            "mean": "35.69783143097308",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "12",
+            "mean": "35.71924889910442",
+            "median": "37.0",
+            "lowerquartile": "34.0",
+            "upperquartile": "37.0",
+            "tenthpercentile": "33.333333333333336",
+            "ninetiethpercentile": "37.0"
+        },
+        {
+            "base": "13",
+            "mean": "37.72366648323813",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "14",
+            "mean": "37.72270756087215",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "15",
+            "mean": "37.71513864021909",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "16",
+            "mean": "37.723867401577245",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "17",
+            "mean": "37.71298000714237",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "18",
+            "mean": "37.71754027350319",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "19",
+            "mean": "37.715292091425304",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "20",
+            "mean": "37.72406470328133",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "21",
+            "mean": "37.72023044005342",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "22",
+            "mean": "37.723180282377946",
+            "median": "38.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "38.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "38.0"
+        },
+        {
+            "base": "23",
+            "mean": "38.32289531437914",
+            "median": "39.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "39.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "39.0"
+        },
+        {
+            "base": "24",
+            "mean": "38.317460070396",
+            "median": "39.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "39.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "39.0"
+        },
+        {
+            "base": "25",
+            "mean": "38.30719352578171",
+            "median": "39.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "39.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "39.0"
+        },
+        {
+            "base": "26",
+            "mean": "38.24499387074692",
+            "median": "39.0",
+            "lowerquartile": "38.0",
+            "upperquartile": "39.0",
+            "tenthpercentile": "38.0",
+            "ninetiethpercentile": "39.0"
+        }
+    ]
+}

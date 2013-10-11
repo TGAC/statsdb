@@ -1,0 +1,34 @@
+<html>
+<head>
+<title> StatsDB:Per Base Content </title>
+
+<script type="text/javascript" src="d3/d3.js"></script>
+<script type="text/javascript" src="d3/d3.layout.js"></script>
+<script type="text/javascript" src="jquery/js/jquery-1.4.2.min.js"></script>
+<script type="text/javascript" src="jquery/js/jquery-ui-1.8.custom.min.js"></script>
+<script type="text/javascript" src="jquery/js/jquery.tablesorter.min.js"></script>
+<script type="text/javascript" src="jquery/js/jquery.drawinglibrary.js"></script>
+<script type="text/javascript" src="scripts/statsdbperbasecontent.js"></script>
+<link rel="stylesheet" href="jquery/css/smoothness/jquery-ui-1.8.custom.css" type="text/css">
+<link rel="stylesheet" href="css/style.css" type="text/css">
+<script type="text/javascript" src="jquery/colorbox/jquery.colorbox-min.js"></script>
+<script>
+
+d3.json("data/perbasecontent.json", function(json) {
+var file = json;
+readStatsdbperbasecontent(file)
+});
+
+</script>
+
+</head>
+
+<body>
+
+<div id=statschartperbasecontentbutton>
+</div>
+
+<div id=statschartperbasecontent>
+</div>
+
+</body>
