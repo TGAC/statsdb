@@ -1,7 +1,7 @@
 package uk.ac.tgac.statsdb.exception;
 
 /**
- * Exception type
+ * Exception class describing exceptions thrown as a result of an unexpected QCAnalysis issue
  *
  * @author Rob Davey
  * @date 02/07/13

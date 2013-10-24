@@ -17,9 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * uk.ac.tgac.qc.dao
- * <p/>
- * Implementation of a QCAnalysisStore
+ * Implementation of a QCAnalysisStore, supporting reading and writing to an SQL database
  *
  * @author Rob Davey
  * @date 02/07/13

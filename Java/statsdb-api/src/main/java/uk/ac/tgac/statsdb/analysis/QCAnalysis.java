@@ -6,9 +6,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * uk.ac.tgac.qc.analysis
- * <p/>
- * Info
+ * Interface defining the contract of QCAnalysis objects
  *
  * @author Rob Davey
  * @date 02/07/13

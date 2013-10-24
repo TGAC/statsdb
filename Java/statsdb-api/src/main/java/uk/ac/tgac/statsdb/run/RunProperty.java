@@ -1,7 +1,7 @@
 package uk.ac.tgac.statsdb.run;
 
 /**
- * Enum representing
+ * Enum representing the set of properties available to use as query keys
  *
  * User: ramirezr
  * Date: 09/03/2012

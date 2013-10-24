@@ -1,5 +1,6 @@
 package uk.ac.tgac.statsdb.run.parser;
 
+import net.sourceforge.fluxion.spi.ServiceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import uk.ac.tgac.statsdb.analysis.AbstractQCAnalysis;
@@ -15,14 +16,13 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * uk.ac.tgac.qc.run.parser
- * <p/>
- * Info
+ * Implementation of a QcReportParser that supports FastQC data files
  *
  * @author Rob Davey
  * @date 03/07/13
  * @since 1.0-SNAPSHOT
  */
+@ServiceProvider
 public class FastQCReportParser implements QcReportParser<File> {
   private Logger log = LoggerFactory.getLogger(getClass());
 
@@ -161,7 +161,7 @@ public class FastQCReportParser implements QcReportParser<File> {
         if (tokens.length == 2) {
           log.debug(tokens[0].trim() + " : " + tokens[1].trim());
           if("Sequence length".equals(tokens[0])) {
-            Map.Entry<Long, Long> range = AbstractQCAnalysis.parseRange(tokens[1]);
+            Map.Entry<Long, Long> range = StatsDBUtils.parseRange(tokens[1]);
             qcAnalysis.addGeneralValue("general_min_length", String.valueOf(range.getKey()), null);
             qcAnalysis.addGeneralValue("general_max_length", String.valueOf(range.getValue()), null);
           }
