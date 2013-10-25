@@ -38,7 +38,17 @@ public class D3PlotConsumer {
     this(template.getDataSource());
   }
 
-  public JSONObject getPerPositionBaseSequenceQualityForLane(String runName, boolean pairedEnd, int laneNumber) throws ConsumerException {
+    /**
+     * Returns JSONObject formatted Sequence Quality report for each lane.
+     *
+     * @param runName
+     * @param pairedEnd
+     * @param laneNumber
+     * @return
+     * @throws ConsumerException
+     */
+
+    public JSONObject getPerPositionBaseSequenceQualityForLane(String runName, boolean pairedEnd, int laneNumber) throws ConsumerException {
     Map<RunProperty, String> map = new HashMap<>();
     map.put(RunProperty.run, runName);
     map.put(RunProperty.lane, String.valueOf(laneNumber));
@@ -87,7 +97,17 @@ public class D3PlotConsumer {
     return laneQuality;
   }
 
-  public JSONObject getPerPositionBaseContentForLane(String runName, boolean pairedEnd, int laneNumber) throws ConsumerException {
+    /**
+     * Returns JSONObject formatted per position base content report for each lane.
+     *
+     * @param runName
+     * @param pairedEnd
+     * @param laneNumber
+     * @return
+     * @throws ConsumerException
+     */
+
+    public JSONObject getPerPositionBaseContentForLane(String runName, boolean pairedEnd, int laneNumber) throws ConsumerException {
     Map<RunProperty, String> map = new HashMap<>();
     map.put(RunProperty.run, runName);
     map.put(RunProperty.lane, String.valueOf(laneNumber));
