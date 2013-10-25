@@ -1,0 +1,3 @@
+db_string	dbi:mysql:statsdb;host=localhost
+db_user	statsdb
+db_password	
