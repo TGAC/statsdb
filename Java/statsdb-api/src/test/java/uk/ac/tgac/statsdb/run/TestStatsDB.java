@@ -7,6 +7,7 @@ import org.junit.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.datasource.SingleConnectionDataSource;
+import uk.ac.tgac.statsdb.run.consumer.D3PlotConsumer;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -31,7 +32,7 @@ import java.util.Properties;
 public class TestStatsDB {
   protected static final Logger log = LoggerFactory.getLogger(TestStatsDB.class);
 
-  private static DataSource datasource;
+  private static SingleConnectionDataSource datasource;
 
   private static final String[] tables = {
       "analysis",
@@ -57,6 +58,7 @@ public class TestStatsDB {
         props.getProperty("db.password")
     );
     datasource = new SingleConnectionDataSource(jdbcConnection, false);
+    datasource.setSuppressClose(true);
   }
 
   @AfterClass
@@ -66,6 +68,7 @@ public class TestStatsDB {
     try {
       if (conn != null) {
         conn.close();
+        datasource.destroy();
       }
     }
     catch (SQLException e) {
@@ -80,6 +83,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("QUALITY MEAN - HiSeq1 -> CSV");
       ReportTable table = r.getPerPositionSummary("quality_mean", "instrument", "HiSeq1");
@@ -104,6 +108,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("PER BASE SUMMARY ANALYSIS");
       List<String> tmp_list = r.listPerBaseSummaryAnalyses();
@@ -121,6 +126,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("GLOBAL ANALYSES");
       List<String> tmp_list = r.listGlobalAnalyses();
@@ -138,6 +144,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("AVERAGE GENERAL TOTAL SEQUENCES - Lane 7");
       log.info(Double.toString(r.getAverageValue("general_total_sequences", "lane", "7")));
@@ -154,6 +161,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("AVERAGE LANE VALUES - Lane 1");
       ReportTable table = r.getAverageValues("lane", "1");
@@ -171,6 +179,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       log.info("AVERAGE BARCODE VALUES - GCCAAT");
       ReportTable table = r.getAverageValues("barcode", "GCCAAT");
@@ -192,6 +201,7 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
 
       List<String> tmp_list = r.getAnalysisProperties();
 
@@ -200,7 +210,7 @@ public class TestStatsDB {
         log.info(s + " -> " + values.toString());
       }
 
-      Map<RunProperty, String> properties = new HashMap<RunProperty, String>();
+      Map<RunProperty, String> properties = new HashMap<>();
       ReportTable table = r.getAverageValues(properties);
       log.info(table.toJSON());
 
@@ -229,7 +239,10 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Map<RunProperty, String> properties = new HashMap<>();
+
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
+
       ReportsDecorator rd = new ReportsDecorator(r);
 
       Map<String, ReportTable> perBaseQuality = rd.getPerPositionBaseSequenceQuality(properties);
@@ -252,7 +265,10 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Map<RunProperty, String> properties = new HashMap<>();
+
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
+
       ReportsDecorator rd = new ReportsDecorator(r);
       ReportTable rt = rd.getOverrepresentedSequences(properties);
 
@@ -270,7 +286,10 @@ public class TestStatsDB {
       Connection con = datasource.getConnection();
 
       Map<RunProperty, String> properties = new HashMap<>();
+
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
+
       ReportsDecorator rd = new ReportsDecorator(r);
 
       Map<String, ReportTable> perBaseQuality = rd.getPerPositionBaseContent(properties);
@@ -292,13 +311,55 @@ public class TestStatsDB {
       TestCase.assertNotNull(datasource);
       Connection con = datasource.getConnection();
 
-      Map<RunProperty, String> properties = new HashMap<RunProperty, String>();
+      Map<RunProperty, String> properties = new HashMap<>();
+
       Reports r = new Reports(con);
+      r.setSuppressClose(true);
+
       ReportsDecorator rd = new ReportsDecorator(r);
 
       ReportTable rt = rd.getOverrepresentedTags(properties);
 
       log.info("Overrepresented tags: " + rt.toCSV());
+    }
+    catch (SQLException e) {
+      e.printStackTrace();
+    }
+  }
+
+  @Test
+  public void testD3Consumer() {
+    try {
+      TestCase.assertNotNull(datasource);
+      Connection con = datasource.getConnection();
+
+      Reports r = new Reports(con);
+      r.setSuppressClose(true);
+
+      ReportsDecorator rd = new ReportsDecorator(r);
+
+      D3PlotConsumer d3p = new D3PlotConsumer(rd);
+
+      log.info("D3.js CONSUMER: ");
+
+      List<String> runs = r.listAllRuns();
+      if (!runs.isEmpty()) {
+        String runName = runs.get(0);
+
+        log.info("RUN: " + runName);
+        log.info("LANE: " + r.listLanesForRun(runName).toString());
+
+        try {
+          log.info(d3p.getPerPositionBaseSequenceQualityForLane(runName, true, 1).toString());
+          log.info(d3p.getPerPositionBaseContentForLane(runName, true, 1).toString());
+        }
+        catch (Exception e) {
+          e.printStackTrace();
+        }
+      }
+      else {
+        log.error("Cannot run D3 test - no runs available in StatsDB");
+      }
     }
     catch (SQLException e) {
       e.printStackTrace();

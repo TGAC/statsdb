@@ -12,6 +12,7 @@ public class Reports {
   private Connection connection;
   private DataSource dataSource = null;
   private JdbcTemplate template = null;
+  private boolean suppressClose = false;
 
   /**
    * Create a Reports object with a Spring JdbcTemplate.
@@ -58,6 +59,14 @@ public class Reports {
     return connection;
   }
 
+  public boolean isSuppressClose() {
+    return suppressClose;
+  }
+
+  public void setSuppressClose(boolean suppressClose) {
+    this.suppressClose = suppressClose;
+  }
+
   /**
    * Method that returns a summary table given an analysis done in partitions (per base, per percentile, etc..(
    *
@@ -83,7 +92,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return rt;
   }
@@ -108,7 +119,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return list;
   }
@@ -133,7 +146,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return list;
   }
@@ -166,7 +181,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return average;
   }
@@ -195,7 +212,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return rt;
   }
@@ -240,7 +259,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return rt;
   }
@@ -287,7 +308,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return rt;
   }
@@ -311,7 +334,9 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return list;
   }
@@ -330,9 +355,133 @@ public class Reports {
       }
     }
     finally {
-      close(con);
+      if (!isSuppressClose()) {
+        close(con);
+      }
     }
     return list;
+  }
+
+  public List<String> listRunsForInstrument(String instrument) throws SQLException {
+    List<String> list = null;
+
+    Connection con = null;
+    try {
+      con = getConnection();
+      PreparedStatement proc = con.prepareStatement("SELECT run FROM run WHERE `instrument` = ? GROUP BY run");
+      proc.setString(1, instrument);
+
+      boolean hadResults = proc.execute();
+      ResultSet rs;
+      if (hadResults) {
+        rs = proc.getResultSet();
+        list = resultSetToList(rs);
+      }
+    }
+    finally {
+      if (!isSuppressClose()) {
+        close(con);
+      }
+    }
+    return list;
+  }
+
+  public List<String> listAllRuns() throws SQLException {
+    List<String> list = null;
+
+    Connection con = null;
+    try {
+      con = getConnection();
+      PreparedStatement proc = con.prepareStatement("SELECT run FROM run GROUP BY run");
+
+      boolean hadResults = proc.execute();
+      ResultSet rs;
+      if (hadResults) {
+        rs = proc.getResultSet();
+        list = resultSetToList(rs);
+      }
+    }
+    finally {
+      if (!isSuppressClose()) {
+        close(con);
+      }
+    }
+    return list;
+  }
+
+  public List<String> listLanesForRun(String run) throws SQLException {
+    List<String> list = null;
+
+    Connection con = null;
+    try {
+      con = getConnection();
+      PreparedStatement proc = con.prepareStatement("SELECT lane FROM run WHERE `run` = ? GROUP BY lane");
+      proc.setString(1, run);
+
+      boolean hadResults = proc.execute();
+      ResultSet rs;
+      if (hadResults) {
+        rs = proc.getResultSet();
+        list = resultSetToList(rs);
+      }
+    }
+    finally {
+      if (!isSuppressClose()) {
+        close(con);
+      }
+    }
+    return list;
+  }
+
+  public List<String> listBarcodesForRunAndLane(String run, String lane) throws SQLException {
+    List<String> list = null;
+
+    Connection con = null;
+    try {
+      con = getConnection();
+      PreparedStatement proc = con.prepareStatement("SELECT barcode FROM run WHERE `run` = ? AND `lane` = ? GROUP BY barcode");
+      proc.setString(1, run);
+      proc.setString(2, lane);
+
+      boolean hadResults = proc.execute();
+      ResultSet rs;
+      if (hadResults) {
+        rs = proc.getResultSet();
+        list = resultSetToList(rs);
+      }
+    }
+    finally {
+      if (!isSuppressClose()) {
+        close(con);
+      }
+    }
+    return list;
+  }
+
+  public String getSampleFromRunLaneBarcode(String run, String lane, String barcode) throws SQLException {
+    List<String> list = null;
+
+    Connection con = null;
+    try {
+      con = getConnection();
+      PreparedStatement proc = con.prepareStatement("SELECT sample_name FROM run WHERE `run` = ? AND `lane` = ? AND `barcode` = ?");
+      proc.setString(1, run);
+      proc.setString(2, lane);
+      proc.setString(3, barcode);
+
+      boolean hadResults = proc.execute();
+      ResultSet rs;
+      if (hadResults) {
+        rs = proc.getResultSet();
+        list = resultSetToList(rs);
+      }
+    }
+    finally {
+      if (!isSuppressClose()) {
+        close(con);
+      }
+    }
+    return list.get(0);
   }
 
   private static List<String> resultSetToList(ResultSet rs) throws SQLException {
@@ -342,12 +491,11 @@ public class Reports {
     if (columnCount != 1)
       throw new SQLException("Expected just one column and found " + columnCount);
 
-    List<String> list = new ArrayList<String>();
+    List<String> list = new ArrayList<>();
     while (rs.next()) {
       list.add(rs.getObject(1).toString());
     }
     return list;
-
   }
 
   private void close(Connection con) {
