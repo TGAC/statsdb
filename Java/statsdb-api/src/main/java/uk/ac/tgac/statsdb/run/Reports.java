@@ -492,7 +492,7 @@ public class Reports {
       throw new SQLException("Expected just one column and found " + columnCount);
 
     List<String> list = new ArrayList<>();
-    while (rs.next()) {
+    while (rs.next() && rs.getObject(1) != null) {
       list.add(rs.getObject(1).toString());
     }
     return list;
