@@ -2,10 +2,10 @@
          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
   <modelVersion>4.0.0</modelVersion>
-  <groupId>uk.ac.bbsrc.tgac</groupId>
+  <groupId>uk.ac.tgac</groupId>
   <artifactId>statsdb</artifactId>
   <packaging>pom</packaging>
-  <version>1.1-SNAPSHOT</version>
+  <version>1.1</version>
   <name>Stats DB Java API</name>
   <url>http://www.tgac.ac.uk/tools-resources/</url>
 
@@ -90,28 +90,28 @@
   <!-- SVN connection -->
   <scm>
     <connection>
-      scm:svn:https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+      scm:svn:https://repos.tgac.ac.uk/subversion/statsdb/trunk/Java/
     </connection>
     <developerConnection>
-      scm:svn:https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+      scm:svn:https://repos.tgac.ac.uk/subversion/statsdb/trunk/Java/
     </developerConnection>
     <url>
-      https://repos.tgac.bbsrc.ac.uk/subversion/statsdb/trunk/Java/
+      https://repos.tgac.ac.uk/subversion/statsdb/trunk/Java/
     </url>
   </scm>
 
   <!-- Maven repository deploy -->
   <distributionManagement>
-    <downloadUrl>https://repos.tgac.bbsrc.ac.uk/maven/repo</downloadUrl>
+    <downloadUrl>https://repos.tgac.ac.uk/maven/repo</downloadUrl>
     <repository>
       <id>tgac-repo</id>
       <name>TGAC repository</name>
-      <url>scp://repos.tgac.bbsrc.ac.uk/storage/html/maven/repo</url>
+      <url>scp://repos.tgac.ac.uk/storage/html/maven/repo</url>
     </repository>
     <snapshotRepository>
       <id>tgac-repo</id>
       <name>TGAC repository</name>
-      <url>scp://repos.tgac.bbsrc.ac.uk/storage/html/maven/repo</url>
+      <url>scp://repos.tgac.ac.uk/storage/html/maven/repo</url>
     </snapshotRepository>
   </distributionManagement>
 
@@ -120,7 +120,7 @@
     <repository>
       <id>tgac-repo</id>
       <name>TGAC Maven Repository</name>
-      <url>https://repos.tgac.bbsrc.ac.uk/maven/repo</url>
+      <url>https://repos.tgac.ac.uk/maven/repo</url>
       <releases>
         <updatePolicy>always</updatePolicy>
       </releases>
@@ -135,7 +135,7 @@
     <pluginRepository>
       <id>tgac-repo</id>
       <name>TGAC Maven Repository</name>
-      <url>https://repos.tgac.bbsrc.ac.uk/maven/repo</url>
+      <url>https://repos.tgac.ac.uk/maven/repo</url>
     </pluginRepository>
   </pluginRepositories>
 

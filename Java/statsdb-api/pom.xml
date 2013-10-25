@@ -3,12 +3,12 @@
 
   <parent>
     <artifactId>statsdb</artifactId>
-    <groupId>uk.ac.bbsrc.tgac</groupId>
-    <version>1.1-SNAPSHOT</version>
+    <groupId>uk.ac.tgac</groupId>
+    <version>1.1</version>
   </parent>
 
   <modelVersion>4.0.0</modelVersion>
-  <groupId>uk.ac.bbsrc.tgac.statsdb</groupId>
+  <groupId>uk.ac.tgac.statsdb</groupId>
   <artifactId>statsdb-api</artifactId>
   <packaging>jar</packaging>
   <version>${parent.version}</version>
@@ -40,6 +40,15 @@
       </plugin>
     </plugins>
   </build>
+
+  <repositories>
+    <!-- Fluxion tools -->
+    <repository>
+      <id>hasbanana-repo</id>
+      <name>hasbanana Maven Repository</name>
+      <url>http://www.hasbanana.com/maven/repo</url>
+    </repository>
+  </repositories>
 
   <dependencies>
     <dependency>
@@ -169,7 +178,7 @@
             <configuration>
               <archive>
                 <manifest>
-                  <mainClass>uk.ac.bbsrc.tgac.statsdb.StatsDbApp</mainClass>
+                  <mainClass>uk.ac.tgac.statsdb.StatsDbApp</mainClass>
                 </manifest>
               </archive>
             </configuration>
