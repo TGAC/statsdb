@@ -20,6 +20,13 @@ unless ($analyses->is_empty) {
 }
 print "\n";
 
+print "\n=== Getting average values ===\n";
+my $average_values = $reports->get_average_values();
+unless ($average_values->is_empty) {
+  print $average_values->to_csv();
+}
+print "\n";
+
 print "\n=== Listing runs ===\n";
 my $runs = $reports->list_all_runs();
 unless ($runs->is_empty) {
