@@ -54,7 +54,7 @@ sub connect(){
         my $self = shift;
         $self->{connection} = DBI->connect($self->{db_string},$self->{db_user},$self->{db_password}) ||
          die "Database connection not made: $DBI::errstr";
-        print "Connected\n";
+#        print "Connected\n";
 }
 
 

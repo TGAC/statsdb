@@ -13,9 +13,19 @@ my $config = $arguments{db_config};
 my $db = Reports::DB->new($config);
 my $reports = Reports->new($db);
 
+print "\n=== Listing global analyses ===\n";
+my $analyses = $reports->list_global_analyses();
+unless ($analyses->is_empty) {
+  print $analyses->to_csv();
+}
+print "\n";
+
+print "\n=== Listing runs ===\n";
 my $runs = $reports->list_all_runs();
 unless ($runs->is_empty) {
-  my $csv = $runs->to_csv();
-  print $csv;
+  print $runs->to_csv();
 }
+print "\n";
+
+$db->disconnect();
 

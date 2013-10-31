@@ -7,8 +7,13 @@ sub new {
 
   my @headers = @{$sth->{NAME_uc}};
   my $table_ref = $sth->fetchrow_arrayref;
+  
+  my @array;
+  while (my $ref = $sth->fetchrow_arrayref()) {
+    push @array,[@$ref];
+  }
 
-  my $self = {"headers" => \@headers, "table" => $table_ref};
+  my $self = {"headers" => \@headers, "table" => \@array};
   bless $self, $class;
   return $self;
 }
@@ -21,7 +26,7 @@ sub to_csv() {
   
   my $out = $headers."\n";
   foreach my $r (@foo) { 
-    my $rowstr = join(",", $r);
+    my $rowstr = join(",", @$r);
     $out .= $rowstr."\n";
   }
   return $out;
