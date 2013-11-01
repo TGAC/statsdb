@@ -12,7 +12,7 @@ sub new {
   while (my $ref = $sth->fetchrow_arrayref()) {
     push @array,[@$ref];
   }
-
+  
   my $self = {"headers" => \@headers, "table" => \@array};
   bless $self, $class;
   return $self;
@@ -34,6 +34,23 @@ sub to_csv() {
 
 sub to_json {
   my $self = shift;
+  ##quote stuff
+  my @h = map {qq|"$_"|} @{$self->{headers}};
+  my $headers = "[".join(",",@h)."]";
+  my @foo = @{$self->{table}};
+  
+  my $out = "[";
+  my @intarr;
+  push(@intarr,$headers);
+
+  foreach my $r (@foo) {
+    my @rs = map {qq|"$_"|} @$r;
+    my $rowstr = "[".join(",", @rs)."]";
+    push(@intarr,$rowstr);
+  }
+  $out .= join(",",@intarr)."]";
+
+  return $out;
 }
 
 sub get_headers() {
