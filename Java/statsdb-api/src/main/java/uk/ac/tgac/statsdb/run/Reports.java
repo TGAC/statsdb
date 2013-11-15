@@ -202,7 +202,7 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      CallableStatement proc = con.prepareCall("{ call general_summaries( ?, ?)}");
+      CallableStatement proc = con.prepareCall("{ call general_summaries(?, ?) }");
       proc.setString(1, analysis_property);
       proc.setString(2, analysis_property_value);
 
@@ -242,7 +242,7 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      CallableStatement proc = con.prepareCall("{ call general_summaries_for_run(?,?,?,?,?)}");
+      CallableStatement proc = con.prepareCall("{ call general_summaries_for_run(?,?,?,?,?) }");
 
       for (int i = 0; i < args.length; i++) {
         if (args[i] == null) {
@@ -291,7 +291,7 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      CallableStatement proc = con.prepareCall("{ call " + storeProcedure + "(?,?,?,?,?,?)}");
+      CallableStatement proc = con.prepareCall("{ call " + storeProcedure + "(?,?,?,?,?,?) }");
 
       for (int i = 0; i < args.length; i++) {
         if (args[i] == null) {
@@ -326,7 +326,7 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      CallableStatement proc = con.prepareCall("{ call list_selectable_properties()}");
+      CallableStatement proc = con.prepareCall("{ call list_selectable_properties() }");
 
       boolean hadResults = proc.execute();
       if (hadResults) {
@@ -346,7 +346,7 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      CallableStatement proc = con.prepareCall("{ call list_selectable_values_from_property(?)}");
+      CallableStatement proc = con.prepareCall("{ call list_selectable_values_from_property(?) }");
       proc.setString(1, property);
 
       boolean hadResults = proc.execute();
@@ -368,8 +368,13 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      PreparedStatement proc = con.prepareStatement("SELECT run FROM run WHERE `instrument` = ? GROUP BY run");
+      //PreparedStatement proc = con.prepareStatement("SELECT run FROM run WHERE `instrument` = ? GROUP BY run");
+      CallableStatement proc = con.prepareCall("{ call list_runs(?, ?, ?, ?, ?) }");
       proc.setString(1, instrument);
+      proc.setNull(2, java.sql.Types.VARCHAR);
+      proc.setNull(3, java.sql.Types.VARCHAR);
+      proc.setNull(4, java.sql.Types.VARCHAR);
+      proc.setNull(5, java.sql.Types.VARCHAR);
 
       boolean hadResults = proc.execute();
       ResultSet rs;
@@ -392,7 +397,13 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      PreparedStatement proc = con.prepareStatement("SELECT run FROM run GROUP BY run");
+      //PreparedStatement proc = con.prepareStatement("SELECT run FROM run GROUP BY run");
+      CallableStatement proc = con.prepareCall("{ call list_runs(?, ?, ?, ?, ?) }");
+      proc.setNull(1, java.sql.Types.VARCHAR);
+      proc.setNull(2, java.sql.Types.VARCHAR);
+      proc.setNull(3, java.sql.Types.VARCHAR);
+      proc.setNull(4, java.sql.Types.VARCHAR);
+      proc.setNull(5, java.sql.Types.VARCHAR);
 
       boolean hadResults = proc.execute();
       ResultSet rs;
@@ -415,7 +426,8 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      PreparedStatement proc = con.prepareStatement("SELECT lane FROM run WHERE `run` = ? GROUP BY lane");
+      //PreparedStatement proc = con.prepareStatement("SELECT lane FROM run WHERE `run` = ? GROUP BY lane");
+      CallableStatement proc = con.prepareCall("{ call list_lanes_for_run(?)}");
       proc.setString(1, run);
 
       boolean hadResults = proc.execute();
