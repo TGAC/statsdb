@@ -368,13 +368,12 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      //PreparedStatement proc = con.prepareStatement("SELECT run FROM run WHERE `instrument` = ? GROUP BY run");
-      CallableStatement proc = con.prepareCall("{ call list_runs(?, ?, ?, ?, ?) }");
+      PreparedStatement proc = con.prepareStatement("SELECT DISTINCT analysis_property.value from analysis_property " +
+                                                    "WHERE property = 'run' " +
+                                                    "AND analysis_id IN " +
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'instrument' AND value = ?);");
       proc.setString(1, instrument);
-      proc.setNull(2, java.sql.Types.VARCHAR);
-      proc.setNull(3, java.sql.Types.VARCHAR);
-      proc.setNull(4, java.sql.Types.VARCHAR);
-      proc.setNull(5, java.sql.Types.VARCHAR);
 
       boolean hadResults = proc.execute();
       ResultSet rs;
@@ -397,7 +396,6 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      //PreparedStatement proc = con.prepareStatement("SELECT run FROM run GROUP BY run");
       CallableStatement proc = con.prepareCall("{ call list_runs(?, ?, ?, ?, ?) }");
       proc.setNull(1, java.sql.Types.VARCHAR);
       proc.setNull(2, java.sql.Types.VARCHAR);
@@ -426,8 +424,11 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      //PreparedStatement proc = con.prepareStatement("SELECT lane FROM run WHERE `run` = ? GROUP BY lane");
-      CallableStatement proc = con.prepareCall("{ call list_lanes_for_run(?)}");
+      PreparedStatement proc = con.prepareStatement("SELECT DISTINCT analysis_property.value from analysis_property " +
+                                                    "WHERE property = 'lane' " +
+                                                    "AND analysis_id IN " +
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'run' AND value = ?);");
       proc.setString(1, run);
 
       boolean hadResults = proc.execute();
@@ -451,9 +452,16 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      PreparedStatement proc = con.prepareStatement("SELECT barcode FROM run WHERE `run` = ? AND `lane` = ? GROUP BY barcode");
-      proc.setString(1, run);
-      proc.setString(2, lane);
+      PreparedStatement proc = con.prepareStatement("SELECT DISTINCT analysis_property.value from analysis_property " +
+                                                    "WHERE property = 'barcode' " +
+                                                    "AND analysis_id IN " +
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'lane' AND value = ?) "+
+                                                    "AND analysis_id IN "+
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'run' AND value = ?);");
+      proc.setString(1, lane);
+      proc.setString(2, run);
 
       boolean hadResults = proc.execute();
       ResultSet rs;
@@ -476,10 +484,20 @@ public class Reports {
     Connection con = null;
     try {
       con = getConnection();
-      PreparedStatement proc = con.prepareStatement("SELECT sample_name FROM run WHERE `run` = ? AND `lane` = ? AND `barcode` = ?");
-      proc.setString(1, run);
+      PreparedStatement proc = con.prepareStatement("SELECT DISTINCT analysis_property.value from analysis_property " +
+                                                    "WHERE property = 'sample_name' " +
+                                                    "AND analysis_id IN " +
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'barcode' AND value = ?) " +
+                                                    "AND analysis_id IN " +
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'lane' AND value = ?) "+
+                                                    "AND analysis_id IN "+
+                                                    "(SELECT DISTINCT analysis_property.analysis_id from analysis_property "+
+                                                    "WHERE property = 'run' AND value = ?);");
+      proc.setString(1, barcode);
       proc.setString(2, lane);
-      proc.setString(3, barcode);
+      proc.setString(3, run);
 
       boolean hadResults = proc.execute();
       ResultSet rs;
