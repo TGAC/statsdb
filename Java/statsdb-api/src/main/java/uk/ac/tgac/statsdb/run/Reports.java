@@ -504,14 +504,15 @@ public class Reports {
       if (hadResults) {
         rs = proc.getResultSet();
         list = resultSetToList(rs);
+        return list.get(0);
       }
+      return "";
     }
     finally {
       if (!isSuppressClose()) {
         close(con);
       }
     }
-    return list.get(0);
   }
 
   private static List<String> resultSetToList(ResultSet rs) throws SQLException {
