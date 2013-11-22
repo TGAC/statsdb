@@ -59,16 +59,26 @@ public class Reports {
     return connection;
   }
 
+  /**
+   * Check the connection closing suppression value.
+   *
+   * @return true if connection closing is suppressed. Defaults to false.
+   */
   public boolean isSuppressClose() {
     return suppressClose;
   }
 
+  /**
+   * Enable/disable the closing of the underlying database connection each time a call is made. The default is false.
+   * ONLY set to true if you are managing your own connection pool and subsequent connection strategy.
+   *
+   */
   public void setSuppressClose(boolean suppressClose) {
     this.suppressClose = suppressClose;
   }
 
   /**
-   * Method that returns a summary table given an analysis done in partitions (per base, per percentile, etc..(
+   * Method that returns a summary table given an analysis done in partitions (per base, per percentile, etc)
    *
    * @param analysis                The analysis to query.
    * @param analysis_property       Property to query
@@ -127,7 +137,7 @@ public class Reports {
   }
 
   /**
-   * List all the analysis that are global to a run. This may also be summaries.
+   * List all the analyses that are global to a run. These may also be summaries.
    *
    * @return
    * @throws SQLException
@@ -189,7 +199,7 @@ public class Reports {
   }
 
   /**
-   * Gets all the summary values from the
+   * Gets all the summary values for the supplied single property and property value
    *
    * @param analysis_property
    * @param analysis_property_value
@@ -220,8 +230,7 @@ public class Reports {
   }
 
   /**
-   * Returns the average values for the run properties.  If a property is missing, the query
-   * aggregates
+   * Returns the average values for the supplied run properties.  If a property is missing, the query aggregates.
    * The RunProperty.barcode has to be in base space.
    * <p/>
    * At the moment, only RunProperty.instrument, RunProperty.run, RunProperty.lane, RunProperty.pair and RunProperty.barcode are supported
@@ -266,14 +275,35 @@ public class Reports {
     return rt;
   }
 
+  /**
+   * Retrieve a summary set of per-position values given an analysis and a set of properties. The properties supplied can
+   * be null, dictating to which level the summary will be generated.
+   *
+   * @return ReportTable representation of summary values per position
+   * @throws SQLException
+   */
   public ReportTable getPerPositionValues(String analysis, Map<RunProperty, String> runProperties) throws SQLException {
     return getResultTableFromStoreProcedure("summary_per_position_for_run", analysis, runProperties);
   }
 
+  /**
+   * Retrieve a set of summary values and related comments given a value scope and a set of properties. The properties supplied can
+   * be null, dictating to which level the summary will be generated
+   *
+   * @return ReportTable representation of summary values with comments
+   * @throws SQLException
+   */
   public ReportTable getSummaryValuesWithComments(String scope, Map<RunProperty, String> runProperties) throws SQLException {
     return getResultTableFromStoreProcedure("summary_value_with_comment", scope, runProperties);
   }
 
+  /**
+   * Retrieve a set of summary values given a value scope and a set of properties. The properties supplied can
+   * be null, dictating to which level the summary will be generated
+   *
+   * @return ReportTable representation of summary values
+   * @throws SQLException
+   */
   public ReportTable getSummaryValues(String scope, Map<RunProperty, String> runProperties) throws SQLException {
     return getResultTableFromStoreProcedure("summary_value", scope, runProperties);
   }
@@ -341,6 +371,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Returns a list of all the values associated to a given single property.
+   *
+   * @return
+   * @throws SQLException
+   */
   public List<String> getValuesForProperty(String property) throws SQLException {
     List<String> list = null;
     Connection con = null;
@@ -362,6 +398,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Canned query to retrieve a list of all runs by an instrument name
+   *
+   * @return
+   * @throws SQLException
+   */
   public List<String> listRunsForInstrument(String instrument) throws SQLException {
     List<String> list = null;
 
@@ -390,6 +432,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Stored procedure query to retrieve a list of all runs
+   *
+   * @return
+   * @throws SQLException
+   */
   public List<String> listAllRuns() throws SQLException {
     List<String> list = null;
 
@@ -418,6 +466,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Canned query to retrieve a list of all lanes for a given run
+   *
+   * @return
+   * @throws SQLException
+   */
   public List<String> listLanesForRun(String run) throws SQLException {
     List<String> list = null;
 
@@ -446,6 +500,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Canned query to retrieve a list of all barcodes represented by a given run and lane
+   *
+   * @return
+   * @throws SQLException
+   */
   public List<String> listBarcodesForRunAndLane(String run, String lane) throws SQLException {
     List<String> list = null;
 
@@ -478,6 +538,12 @@ public class Reports {
     return list;
   }
 
+  /**
+   * Canned query to retrieve a sample name represented by a given run, lane and barcode
+   *
+   * @return
+   * @throws SQLException
+   */
   public String getSampleFromRunLaneBarcode(String run, String lane, String barcode) throws SQLException {
     List<String> list = null;
 
