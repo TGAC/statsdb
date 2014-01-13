@@ -85,7 +85,8 @@ sub get_average_value() {
 
 sub get_average_values() {
   my $self = shift;
-  my %properties = shift; 
+  my $pref = shift;
+  my %properties = %$pref; 
 
   my @args = (undef, undef, undef, undef, undef);
   $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
@@ -111,8 +112,9 @@ sub get_average_values() {
 sub get_per_position_values() {
   my $self = shift;
   my $analysis = shift;
-  my %properties = shift;
-
+  my $pref = shift;
+  my %properties = %$pref; 
+  
   my @args = (undef, undef, undef, undef, undef, undef);
   $args[0] = $analysis;
   $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
@@ -139,7 +141,8 @@ sub get_per_position_values() {
 sub get_summary_values_with_comments() {
   my $self = shift;
   my $scope = shift;
-  my %properties = shift;
+  my $pref = shift;
+  my %properties = %$pref; 
 
   my @args = (undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
@@ -151,6 +154,7 @@ sub get_summary_values_with_comments() {
 
   my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
   $sth->bind_param(2, $args[1]);
@@ -167,7 +171,8 @@ sub get_summary_values_with_comments() {
 sub get_summary_values() {
   my $self = shift;
   my $scope = shift;
-  my %properties = shift;
+  my $pref = shift;
+  my %properties = %$pref; 
 
   my @args = (undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
