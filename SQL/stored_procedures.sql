@@ -180,26 +180,65 @@ CREATE PROCEDURE summary_per_position_for_run(
 	IN pair_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))
 BEGIN
+        DECLARE scope VARCHAR(500);
+	DECLARE valtype_id VARCHAR (500);
     
-    SELECT  
-    position as Position, 
-    size as Size, 
-    AVG(value) as Average, 
-	COUNT(*) as Samples,
-	sum(value) as Total
-    FROM value_type, per_partition_value,type_scope, latest_run as run
-    WHERE type_scope.scope = "base_partition"
-		AND type_scope.id=value_type.type_scope_id  
-		AND value_type.description = partition_value
-		AND value_type.id = per_partition_value.value_type_id  
-		AND per_partition_value.analysis_id=run.analysis_id
-		AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-		AND IF(run_in IS NULL, TRUE, run.run = run_in)
-		AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in ) 
-		AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-		AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
-    GROUP BY value_type.id, position, size
-	ORDER BY Position;
+	SET scope = (
+		SELECT type_scope.scope 
+		FROM type_scope 
+		WHERE type_scope.id = (
+			SELECT value_type.type_scope_id 
+			FROM value_type 
+			WHERE value_type.description = partition_value
+		)
+	);
+	
+	SET valtype_id = (SELECT id FROM value_type WHERE value_type.description = partition_value);
+	
+	IF EXISTS (SELECT * FROM statsdb.per_partition_value WHERE value_type_id = valtype_id) THEN
+		SELECT  
+		position as Position,
+		size as Size,
+		AVG(value) as Average,
+		COUNT(*) as Samples,
+		sum(value) as Total
+		FROM value_type, per_partition_value,type_scope, latest_run as run
+		WHERE type_scope.scope = scope
+			AND type_scope.id=value_type.type_scope_id  
+			AND value_type.description = partition_value
+			AND value_type.id = per_partition_value.value_type_id  
+			AND per_partition_value.analysis_id=run.analysis_id
+			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
+			AND IF(run_in IS NULL, TRUE, run.run = run_in)
+			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
+			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
+			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+		GROUP BY value_type.id, position, size
+		;
+	ELSEIF EXISTS (SELECT * FROM statsdb.per_position_value WHERE value_type_id = valtype_id) THEN
+		SELECT  
+		position as Position,  
+		'1' as Size,
+		AVG(value) as Average,
+		COUNT(*) as Samples,
+		sum(value) as Total
+		FROM value_type, per_position_value,type_scope, latest_run as run
+		WHERE type_scope.scope = scope
+			AND type_scope.id=value_type.type_scope_id  
+			AND value_type.description = partition_value
+			AND value_type.id = per_position_value.value_type_id  
+			AND per_position_value.analysis_id=run.analysis_id
+			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
+			AND IF(run_in IS NULL, TRUE, run.run = run_in)
+			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
+			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
+			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+		GROUP BY value_type.id, position
+		ORDER BY Position
+		;
+	
+	END IF;
+	
 END$$
 
 call summary_per_position_for_run("quality_mean", NULL, NULL, NULL, NULL, NULL)$$
