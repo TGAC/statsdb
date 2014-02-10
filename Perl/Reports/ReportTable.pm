@@ -4,9 +4,9 @@ use strict;
 sub new {
   my $class = shift;
   my $sth = shift;
-
+  
   my @headers = @{$sth->{NAME_uc}};
-  my $table_ref = $sth->fetchrow_arrayref;
+  #my $table_ref = $sth->fetchrow_arrayref;
   
   my @array;
   while (my $ref = $sth->fetchrow_arrayref()) {
