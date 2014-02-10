@@ -232,6 +232,17 @@ sub list_all_runs_for_instrument() {
   return Reports::ReportTable->new($sth);
 }
 
+sub list_all_instruments {
+  my $self = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "SELECT instrument FROM run GROUP BY instrument";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
 sub list_all_runs {
   my $self = shift;
 
@@ -251,7 +262,81 @@ sub list_lanes_for_run() {
   my $statement = "SELECT lane FROM run WHERE `run` = ? GROUP BY lane";
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->execute($run);
+  
+  return Reports::ReportTable->new($sth);
+}
 
+sub list_subdivisions() {
+  # Assemble a query to get all the available runs, lanes on a run etc. when passed
+  # a given set of information. Generalist by design.
+  # Get inputs via a hash. Assemble query internally.
+  my $self = shift;
+  my $pref = shift;
+  my %properties = %$pref; 
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
+  $args[1] = $properties{RUN} if exists $properties{RUN};
+  $args[2] = $properties{LANE} if exists $properties{LANE};
+  $args[3] = $properties{PAIR} if exists $properties{PAIR};
+  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
+  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[6] = $properties{QSCOPE} if exists $properties{QSCOPE};
+  
+  # Add bits to the statement to reflect available information
+  # GROUP BY column supplied as queryscope (plus higher-level scopes)
+  
+  my @available_columns = ('instrument','run','lane','sample_name','barcode','pair');
+  my @retrieve_these = ();
+  my $col = ();
+  if ($args[6]) {
+    do {
+      $col = shift @available_columns;
+      push @retrieve_these, $col;
+    }
+    until (($col eq $args[6]) || (@available_columns == 0));
+    
+    # Ensure that if 'sample_name' is in @available_columns,
+    # 'barcode' is as well
+    # (vice versa ensured by @available_columns order!)
+    my $jn = join ' ', @retrieve_these;
+    if (($jn =~ /sample_name/) && ($jn !~ /barcode/)) {
+      push @retrieve_these, "barcode";
+    }
+  }
+  else {
+    if ($args[0]) { push @retrieve_these, 'instrument'; }
+    if ($args[1]) { push @retrieve_these, 'run'; }
+    if ($args[2]) { push @retrieve_these, 'lane'; }
+    if ($args[4] || $args[5]) {
+      push @retrieve_these, 'sample_name';
+      push @retrieve_these, 'barcode';
+    }
+    if ($args[3]) { push @retrieve_these, 'pair'; }
+  }
+  $col = join ',', @retrieve_these;
+  
+  my @where_components = ();
+  my @query_values = ();
+  if ($args[0]) { push @where_components, 'instrument = ? ';  push @query_values, $args[0]; }
+  if ($args[1]) { push @where_components, 'run = ? ';         push @query_values, $args[1]; }
+  if ($args[2]) { push @where_components, 'lane = ? ';        push @query_values, $args[2]; }
+  if ($args[4]) { push @where_components, 'sample_name = ? '; push @query_values, $args[4]; }
+  if ($args[5]) { push @where_components, 'barcode = ? ';     push @query_values, $args[5]; }
+  if ($args[3]) { push @where_components, 'pair = ? ';        push @query_values, $args[3]; }
+  
+  my $statement = "SELECT $col FROM run ";
+  if (@where_components) {
+    my $where_string = join 'AND ', @where_components;
+    $where_string = "WHERE $where_string";
+    $statement = $statement.$where_string;
+  }
+  $statement = $statement."GROUP BY $col ORDER BY $col";
+  
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute(@query_values);
+  
   return Reports::ReportTable->new($sth);
 }
 
@@ -281,5 +366,110 @@ sub get_samples_from_run_lane_barcode() {
 
   return Reports::ReportTable->new($sth);
 }
+
+sub get_encoding_for_run() {
+  my $self = shift;
+  my $run = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "SELECT encoding FROM run WHERE `run` = ? AND encoding IS NOT NULL GROUP BY encoding";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($run);
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_analysis_id() {
+  my $self = shift;
+  my $pref = shift;
+  my %properties = %$pref; 
+  
+  my @args = (undef, undef, undef, undef, undef, undef);
+  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
+  $args[1] = $properties{RUN} if exists $properties{RUN};
+  $args[2] = $properties{LANE} if exists $properties{LANE};
+  $args[3] = $properties{PAIR} if exists $properties{PAIR};
+  $args[4] = $properties{SAMPLE} if exists $properties{SAMPLE};
+  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  
+  my @query_values = ();
+  my @where_components = ();
+  if ($args[0]) { push @where_components, 'instrument = ? ';  push @query_values, $args[0]; }
+  if ($args[1]) { push @where_components, 'run = ? ';         push @query_values, $args[1]; }
+  if ($args[2]) { push @where_components, 'lane = ? ';        push @query_values, $args[2]; }
+  if ($args[4]) { push @where_components, 'sample_name = ? '; push @query_values, $args[4]; }
+  if ($args[5]) { push @where_components, 'barcode = ? ';     push @query_values, $args[5]; }
+  if ($args[3]) { push @where_components, 'pair = ? ';        push @query_values, $args[3]; }
+  
+  my $statement = "SELECT analysis_id FROM run WHERE ";
+  if (@where_components) {
+    my $where_string = join 'AND ', @where_components;
+    $statement = $statement.$where_string;
+  }
+  $statement = $statement."GROUP BY analysis_id";
+  
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute(@query_values);
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_properties_for_analysis_ids() {
+  my $self = shift;
+  my $idref = shift;
+  my @args = @$idref; 
+  
+  # Add bits to the statement to reflect available information
+  my $statement = "SELECT property, value FROM analysis_property ";
+  my @where_components = ();
+  foreach (1..@args) {
+    push @where_components, "analysis_id = ? ";
+  }
+  
+  if (@where_components) {
+    my $where_string = join 'OR ', @where_components;
+    $where_string = "WHERE $where_string";
+    $statement = $statement.$where_string;
+  }
+  $statement = $statement."GROUP BY property, value ORDER BY property, value";
+  
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute(@args);
+  
+  return Reports::ReportTable->new($sth);
+}
+
+
+# These two take care of barcode/sample name interchange.
+# Note that sample names are (or should be) unique, so no further
+# information need be supplied; barcodes, however, are not, so
+# run ID should also be passed.
+sub get_barcodes_for_sample_name() {
+  my $self = shift;
+  my $sample = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "SELECT barcode FROM run WHERE `sample_name` = ? GROUP BY barcode";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($sample);
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_sample_name_for_barcode() {
+  my $self = shift;
+  my $run = shift;
+  my $sample = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "SELECT barcode FROM run WHERE `run` = ? AND `sample_name` = ? GROUP BY barcode";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($run, $sample);
+
+  return Reports::ReportTable->new($sth);
+}
+
 
 1;
