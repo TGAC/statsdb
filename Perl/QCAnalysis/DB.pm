@@ -61,7 +61,7 @@ sub parse_details(){
 	while(my $line = $config_fh->getline()){
 		chomp $line;
 	#	print $line."\n";
-		if($line =~ /(\S+)\t(\S*)/){
+		if($line =~ /(\S+)\s(\S*)/){
 			$self->{$1} = $2;
 		}
 	}
