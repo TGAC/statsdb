@@ -16,6 +16,7 @@ system ('clear');
 my $help = ();      my $config = ();    my $instrument = ();    
 my $run = ();       my $lane = ();      my $pair = ();
 my $sample = ();    my $barcode = ();   my $queryscope = 'na';
+my $begindate = (); my $enddate = ();
 
 # Get all flags. Check that the right flags have been used.
 my $incorrect_flags = 0;
@@ -44,7 +45,9 @@ GetOptions(
   'p|pair:s'       => \$pair,
   's|sample:s'     => \$sample,
   'b|barcode:s'    => \$barcode,
-  'q|scope:s'      => \$queryscope
+  'q|scope:s'      => \$queryscope,
+  'b|begin:s'      => \$begindate,
+  'e|end:s'        => \$enddate
 );
 
 # Call help if -h is used, or if incorrect flags are set
@@ -54,15 +57,21 @@ if (($help) || ($incorrect_flags == 1)) {
 This script simply retrieves QC data associated with specific analyses corresponding to the inputs described below.
 -----
 Calling StatsDB Perl consumer with command line options:
-  -d  Database connection specification file (required)
-  -i  Instrument name
-  -r  Run ID
-      (Instrument name OR Run ID are required)
-  -l  Lane (optional)
-  -p  Read (optional)
-  -b  Barcode  (optional)
-  -s  Sample name  (optional)
-  -q  Query scope (optional)
+  -d or --db_config  Database connection specification file (required)
+  
+  -i or --instrument Instrument name
+  -r or --run        Run ID
+                      (Instrument name OR Run ID are required)
+  -l or --lane       Lane (optional)
+  -p or --pair       Read (optional)
+  -b or --barcode    Barcode  (optional)
+  -s or --sample     Sample name  (optional)
+  -q or --scope      Query scope (optional)
+                      (see selectable values in list, below)
+  -b or --begin      Beginning of a date range (optional)
+  -e or --end        End of a date range (optional)
+                      (If left blank and -b supplied, all data between
+                       -b [date] and current time is returned)
 -----
 Available query scopes:
       instrument
@@ -145,7 +154,7 @@ else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions(\%input_values);
   my $avg = $qry->to_csv;
-  my @returned_values = split /\s/, $avg;
+  my @returned_values = split /\n/, $avg;
   my $colheads = shift @returned_values;
   my @column_headers = split /,/, $colheads;
   

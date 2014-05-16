@@ -49,6 +49,24 @@ BEGIN
 SELECT value FROM analysis_property WHERE property = prop GROUP BY value;
 END$$
 
+DROP PROCEDURE IF EXISTS select_runs_between_dates
+CREATE PROCEDURE select_runs_between_dates(
+	IN date1 TIMESTAMP, 
+    IN date2 TIMESTAMP)
+BEGIN
+	DECLARE hold TIMESTAMP;
+	IF (date2 < date1) THEN
+		SET hold = date2;
+		SET date2 = date1;
+		SET date1 = hold;
+	END IF;
+	SELECT run
+	FROM analysis, run
+		WHERE analysis.id = run.analysis_id
+		AND analysis.analysisDate BETWEEN date1 AND date2
+	GROUP BY run;
+END
+
 DROP PROCEDURE IF EXISTS general_summary$$
 
 CREATE PROCEDURE general_summary(

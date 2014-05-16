@@ -266,6 +266,39 @@ sub list_lanes_for_run() {
   return Reports::ReportTable->new($sth);
 }
 
+sub get_timestamp_for_run() {
+  # Retrieves the timestamp assigned to each run's insertion into the database.
+  my $self = shift;
+  my $run = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "SELECT analysisDate FROM analysis, run
+    WHERE `run.run` = ?
+    AND analysis.id = run.analysis_id
+    GROUP BY analysisDate;";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($run);
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_runs_between_dates() {
+  # Retrieves runs that were inserted into the database between two given timepoints
+  # Note that since the actual time of the analysis is recorded, this data will change
+  # if the database is repopulated.
+  
+  my $self = shift;
+  my $date1 = shift;
+  my $date2 = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "CALL select_runs_between_dates(?, ?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($date1, $date2);
+
+  return Reports::ReportTable->new($sth);
+}
+
 sub list_subdivisions() {
   # Assemble a query to get all the available runs, lanes on a run etc. when passed
   # a given set of information. Generalist by design.
