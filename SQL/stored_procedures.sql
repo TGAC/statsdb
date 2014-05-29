@@ -215,7 +215,7 @@ BEGIN
 			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
 		GROUP BY value_type.id, position, size
 		;
-	ELSEIF EXISTS (SELECT * FROM statsdb.per_position_value WHERE value_type_id = valtype_id) THEN
+	ELSE
 		SELECT  
 		position as Position,  
 		'1' as Size,
