@@ -23,7 +23,7 @@ COMMENT = 'This table sets if the scope is for run, for each base, or p' /* comm
 CREATE  TABLE IF NOT EXISTS `value_type` (
   `id` INT NOT NULL AUTO_INCREMENT,
   `type_scope_id` INT NOT NULL ,
-  `description` VARCHAR(45) NULL ,
+  `description` TEXT NULL ,
   `comment` VARCHAR(200) NULL ,
   PRIMARY KEY (`id`) ,
   INDEX `fk_value_type_type_scope` (`type_scope_id` ASC) ,
