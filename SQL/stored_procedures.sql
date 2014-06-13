@@ -250,6 +250,21 @@ BEGIN
 END $$
 call list_lanes_for_run( "140307_M00841_0059_000000000-A81V3")$$
 
+DROP PROCEDURE IF EXISTS list_barcodes_for_run_and_lane$$
+CREATE PROCEDURE list_barcodes_for_run_and_lane(
+	IN run_in VARCHAR(500), 
+	IN lane_in VARCHAR(500))
+BEGIN
+	SELECT DISTINCT analysis_property.value from analysis_property
+	WHERE property = 'barcode'
+	AND analysis_id IN 
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'lane' AND value = lane_in)
+		AND analysis_id IN 
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'run' AND value = run_in);
+END$$
+call list_barcodes_for_run_and_lane( "140603_SN7001150_0264_BH9H2NADXX", 2)$$
 
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
 CREATE PROCEDURE summary_value_with_comment(
