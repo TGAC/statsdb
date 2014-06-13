@@ -238,10 +238,18 @@ CREATE PROCEDURE list_runs_for_instrument(IN instrument  VARCHAR(500))
 END$$
 
 call list_runs_for_instrument( "M00841")$$
-DROP PROCEDURE IF EXISTS list_lanes_for_run$$
-CREATE PROCEDURE list_lanes_for_run(IN rin VARCHAR(500))
 
+DROP PROCEDURE IF EXISTS list_lanes_for_run$$
+CREATE PROCEDURE list_lanes_for_run(IN run_in VARCHAR(500))
+BEGIN
+	SELECT DISTINCT analysis_property.value from analysis_property 
+	WHERE property = 'lane' 
+	AND analysis_id IN 
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'run' AND value = run_in);
 END $$
+call list_lanes_for_run( "140307_M00841_0059_000000000-A81V3")$$
+
 
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
 CREATE PROCEDURE summary_value_with_comment(
