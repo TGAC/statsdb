@@ -227,6 +227,22 @@ END$$
 
 call list_runs( NULL, NULL, NULL, NULL, NULL)$$
 
+DROP PROCEDURE IF EXISTS list_runs_for_instrument$$
+CREATE PROCEDURE list_runs_for_instrument(IN instrument  VARCHAR(500)) 
+	SELECT DISTINCT analysis_property.value from analysis_property 
+		WHERE property = 'run' AND 
+        	analysis_id IN 
+				(SELECT DISTINCT analysis_property.analysis_id 
+					from analysis_property 
+					WHERE property = 'instrument' AND value = instrument);
+END$$
+
+call list_runs_for_instrument( "M00841")$$
+DROP PROCEDURE IF EXISTS list_lanes_for_run$$
+CREATE PROCEDURE list_lanes_for_run(IN rin VARCHAR(500))
+
+END $$
+
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
 CREATE PROCEDURE summary_value_with_comment(
 IN scope_in VARCHAR(45), 
