@@ -266,6 +266,32 @@ BEGIN
 END$$
 call list_barcodes_for_run_and_lane( "140603_SN7001150_0264_BH9H2NADXX", 2)$$
 
+
+DROP PROCEDURE IF EXISTS get_sample_from_run_lane_barcode $$
+CREATE PROCEDURE get_sample_from_run_lane_barcode(
+
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500), 
+	IN barcode_in VARCHAR(500)
+		
+	)
+BEGIN
+	SELECT DISTINCT analysis_property.value from analysis_property 
+	WHERE property = 'sample_name'
+	AND analysis_id IN
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'barcode' AND value = barcode_in)
+	AND analysis_id IN 
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'lane' AND value = lane_in) 
+	AND analysis_id IN 
+		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
+			WHERE property = 'run' AND value = run_in);
+END$$
+
+call get_sample_from_run_lane_barcode("GTGAAA","140603_SN7001150_0264_BH9H2NADXX", 2) $$
+
+
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
 CREATE PROCEDURE summary_value_with_comment(
 IN scope_in VARCHAR(45), 
