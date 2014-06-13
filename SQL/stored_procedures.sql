@@ -165,11 +165,6 @@ BEGIN
 
 END$$
 
--- call general_summaries_for_run(NULL, NULL, NULL, NULL, NULL)$$
-
--- call general_summaries_for_run(NULL, NULL, "1", NULL, NULL)$$
-
--- call general_summaries_for_run(NULL, NULL, "2", NULL, NULL)$$
 -- 
 DROP PROCEDURE IF EXISTS summary_per_position_for_run$$
 CREATE PROCEDURE summary_per_position_for_run(
@@ -241,8 +236,6 @@ BEGIN
 	
 END$$
 
-call summary_per_position_for_run("quality_mean", NULL, NULL, NULL, NULL, NULL)$$
-
 DROP PROCEDURE IF EXISTS list_runs$$
 CREATE PROCEDURE list_runs(
 	IN instrument_in VARCHAR(500),
@@ -264,8 +257,6 @@ BEGIN
 
 END$$
 
-call list_runs( NULL, NULL, NULL, NULL, NULL)$$
-
 DROP PROCEDURE IF EXISTS list_runs_for_instrument$$
 CREATE PROCEDURE list_runs_for_instrument(IN instrument  VARCHAR(500)) 
 	SELECT DISTINCT analysis_property.value from analysis_property 
@@ -276,8 +267,6 @@ CREATE PROCEDURE list_runs_for_instrument(IN instrument  VARCHAR(500))
 					WHERE property = 'instrument' AND value = instrument);
 END$$
 
-call list_runs_for_instrument( "M00841")$$
-
 DROP PROCEDURE IF EXISTS list_lanes_for_run$$
 CREATE PROCEDURE list_lanes_for_run(IN run_in VARCHAR(500))
 BEGIN
@@ -287,7 +276,6 @@ BEGIN
 		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
 			WHERE property = 'run' AND value = run_in);
 END $$
-call list_lanes_for_run( "140307_M00841_0059_000000000-A81V3")$$
 
 DROP PROCEDURE IF EXISTS list_barcodes_for_run_and_lane$$
 CREATE PROCEDURE list_barcodes_for_run_and_lane(
@@ -303,8 +291,6 @@ BEGIN
 		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
 			WHERE property = 'run' AND value = run_in);
 END$$
-call list_barcodes_for_run_and_lane( "140603_SN7001150_0264_BH9H2NADXX", 2)$$
-
 
 DROP PROCEDURE IF EXISTS get_sample_from_run_lane_barcode $$
 CREATE PROCEDURE get_sample_from_run_lane_barcode(
@@ -327,9 +313,6 @@ BEGIN
 		(SELECT DISTINCT analysis_property.analysis_id from analysis_property 
 			WHERE property = 'run' AND value = run_in);
 END$$
-
-call get_sample_from_run_lane_barcode("GTGAAA","140603_SN7001150_0264_BH9H2NADXX", 2) $$
-
 
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
 CREATE PROCEDURE summary_value_with_comment(
@@ -363,7 +346,7 @@ BEGIN
 		;
 	
 END$$
-call summary_value_with_comment("overrepresented_sequence", NULL, NULL, NULL, NULL, NULL)$$
+
 DROP PROCEDURE IF EXISTS summary_value$$
 CREATE PROCEDURE summary_value(
 IN scope_in VARCHAR(45), 
@@ -394,7 +377,6 @@ BEGIN
 		Total Desc
 		;
 END$$
-call summary_value("multiplex_tag", NULL, NULL, NULL, NULL, NULL)$$
 
 -- call summary_per_position_for_run("quality_mean",NULL, NULL, "1", NULL, NULL)$$
 
