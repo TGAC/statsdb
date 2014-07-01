@@ -4,6 +4,7 @@ use Getopt::Long;
 use List::Util qw(min max);
 use Reports::DB;
 use Reports;
+use Timecode;
 
 # This more complex consumer uses R and self-generated LaTeX scripts to produce
 # graphical output describing QC data, in a format similar to that produced by
@@ -13,9 +14,9 @@ system ('clear');
 
 # First, retrieve passed parameters
 # Also, supply help if asked
-my $help = ();      my $config = ();    my $instrument = ();    
-my $run = ();       my $lane = ();      my $pair = ();
-my $sample = ();    my $barcode = ();   my $queryscope = 'na';
+my $queryscope = 'na';
+my ($help, $config, $instrument, $run, $lane, $pair,
+    $sample, $barcode, $begindate, $enddate) = ();
 
 # Get all flags. Check that the right flags have been used.
 my $incorrect_flags = 0;
@@ -44,7 +45,9 @@ GetOptions(
   'p|pair:s'       => \$pair,
   's|sample:s'     => \$sample,
   'b|barcode:s'    => \$barcode,
-  'q|scope:s'      => \$queryscope
+  'q|scope:s'      => \$queryscope,
+  'c|begin:s'      => \$begindate,
+  'e|end:s'        => \$enddate
 );
 
 # Call help if -h is used, or if incorrect flags are set
@@ -54,23 +57,24 @@ if (($help) || ($incorrect_flags == 1)) {
 This script produces a set of reports, similar to a FastQC report, from QC data associated with specific analyses corresponding to the inputs described below.
 -----
 Calling StatsDB Perl consumer with command line options:
-  -d  Database connection specification file (required)
-  -i  Instrument name
-  -r  Run ID
-      (Instrument name OR Run ID are required)
-  -l  Lane (optional)
-  -p  Read (optional)
-  -b  Barcode  (optional)
-  -s  Sample name  (optional)
-  -q  Query scope (optional)
+  -d or --db_config   Database connection specification file (required)
+  -i or --instrument  Instrument name (optional)
+  -r or --run         Run ID (optional)
+  -l or --lane        Lane (optional)
+  -p or --pair        Read (optional)
+  -b or --barcode     Barcode  (optional)
+  -s or --sample      Sample name  (optional)
+  -q or --scope       Query scope (optional)
+  -c or --begin       Begin date, when selecting data based upon run date (optional)
+  -e or --end         End date, when selecting data based upon run date (optional)
 -----
 Available query scopes:
       instrument
       run
       lane
-      sample
+      pair
+      sample_name
       barcode
-      read
 -----
 To produce QC overviews for each sample in a given run, for example, specify a run with the -r flag, and set the scope of the query to 'sample'. This produces a set of reports - one for each sample - in a single PDF. If the query scope is unspecified, a single report (consisting of readings averaged across the whole run) is produced instead.
 -----
@@ -98,6 +102,14 @@ if ($pair)       { $input_values{PAIR} = $pair; }
 if ($barcode)    { $input_values{BARCODE} = $barcode; }
 if ($sample)     { $input_values{SAMPLE_NAME} = $sample; }
 
+# Handle date-times, if any are supplied as inputs
+if ($begindate || $enddate) {
+  my $timestamp1 = Timecode::parse_input_date($begindate);
+  my $timestamp2 = Timecode::parse_input_date($enddate);
+  
+  $input_values{DATE1} = $timestamp1;
+  $input_values{DATE2} = $timestamp2;
+}
 
 # Check that query scope (if passed) is set to a sensible value.
 # $queryscope should also be modified slightly to reflect column names
@@ -105,8 +117,8 @@ if ($sample)     { $input_values{SAMPLE_NAME} = $sample; }
 chomp $queryscope;
 $queryscope =~ s/\'//g;
 $queryscope = lc $queryscope;
-unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^barcode$|^read$|^na$/) {
-  die "Query scope should be set to one of:\ninstrument\nrun\nlane\nsample / barcode\nread\nor left unset\n";
+unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^na$/) {
+  die "Query scope should be set to one of:\ninstrument\nrun\nlane\nsample_name\nbarcode\nread\nor left unset\n";
 }
 if ($queryscope =~ /sample/) { $queryscope = 'sample_name'; }
 if ($queryscope =~ /read/)   { $queryscope = 'pair'; }
