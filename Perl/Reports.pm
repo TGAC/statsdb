@@ -339,7 +339,8 @@ sub list_subdivisions() {
   $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
   $args[6] = $properties{DATE1} if exists $properties{DATE1};
   $args[7] = $properties{DATE2} if exists $properties{DATE2};
-  $args[8] = $properties{QSCOPE} if exists $properties{QSCOPE};
+  $args[8] = $properties{TOOL} if exists $properties{TOOL};
+  $args[9] = $properties{QSCOPE} if exists $properties{QSCOPE};
   
   my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
@@ -353,10 +354,8 @@ sub list_subdivisions() {
   $sth->bind_param(6, $args[5]);
   $sth->bind_param(7, $args[6]);
   $sth->bind_param(8, $args[7]);
-  # FastQC data must be specified because otherwise kmer contamination data
-  # gets mixed in - and that confuses everything.
-  $sth->bind_param(9, 'FastQC');
-  $sth->bind_param(10, $args[8]);
+  $sth->bind_param(9, $args[8]);
+  $sth->bind_param(10, $args[9]);
   
   $sth->execute();
   

@@ -6,13 +6,14 @@ our %values;
 
 our %header_scopes;
 
-sub add_header_scope{
-	my $class = shift;
-	my $type = shift;
-	my $scope = shift;
-	$header_scopes{$type} = $scope;
-	
-}
+# This appears to be legacy code that no longer does anything.
+#sub add_header_scope{
+#	my $class = shift;
+#	my $type = shift;
+#	my $scope = shift;
+#	$header_scopes{$type} = $scope;
+#	
+#}
 
 sub parse_file(){
 	my $class = shift;

@@ -6,6 +6,8 @@ use Reports::DB;
 use Reports;
 use Timecode;
 
+# This is a consumer designed specifically to retrieve data parsed from
+# FastQC analysis. 
 # This more complex consumer uses R and self-generated LaTeX scripts to produce
 # graphical output describing QC data, in a format similar to that produced by
 # FastQC.
@@ -87,10 +89,12 @@ print "DB configuration: ". $config."\n";
 my $db = Reports::DB->new($config);
 my $reports = Reports->new($db);
 
-# At least one of $instrument and $run must be set. Check that this is so here.
-unless ($run || $instrument) {
-  die "A run ID (-r) or an instrument name (-i) parameter must be passed.\n";
-}
+# It used to be that at least one of $instrument and $run must be set.
+# Since a user can now query all runs within a given time frame
+# across more than one machine, though, I can switch this off.
+#unless ($run || $instrument) {
+#  die "A run ID (-r) or an instrument name (-i) parameter must be passed.\n";
+#}
 
 # Populate the query properties hash with supplied values (DBI cleverly deals with non-
 # supplied fields in the appropriate way).
@@ -101,6 +105,7 @@ if ($lane)       { $input_values{LANE} = $lane; }
 if ($pair)       { $input_values{PAIR} = $pair; }
 if ($barcode)    { $input_values{BARCODE} = $barcode; }
 if ($sample)     { $input_values{SAMPLE_NAME} = $sample; }
+$input_values{TOOL} = 'FastQC';
 
 # Handle date-times, if any are supplied as inputs
 if ($begindate || $enddate) {
@@ -117,7 +122,7 @@ if ($begindate || $enddate) {
 chomp $queryscope;
 $queryscope =~ s/\'//g;
 $queryscope = lc $queryscope;
-unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^na$/) {
+unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^pair$|^na$/) {
   die "Query scope should be set to one of:\ninstrument\nrun\nlane\nsample_name\nbarcode\nread\nor left unset\n";
 }
 if ($queryscope =~ /sample/) { $queryscope = 'sample_name'; }

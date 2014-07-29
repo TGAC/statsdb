@@ -6,6 +6,8 @@ use Reports::DB;
 use Reports;
 use Timecode;
 
+# This is a consumer designed specifically to retrieve data parsed from
+# FastQC analysis. 
 # This simpler version of the StatsDB consumer shows how data is retrieved, and
 # is well suited to modification for alternative output formats, or simply
 # retrieving stored data in text format. 
@@ -88,11 +90,11 @@ my $db = Reports::DB->new($config);
 my $reports = Reports->new($db);
 
 # It used to be that at least one of $instrument and $run must be set.
-# Since a user might want to query all runs within a given time frame
-# across more than one machine, though, 
-unless ($run || $instrument) {
-  die "A run ID (-r) or an instrument name (-i) parameter must be passed.\n";
-}
+# Since a user can now query all runs within a given time frame
+# across more than one machine, though, I can switch this off.
+#unless ($run || $instrument) {
+#  die "A run ID (-r) or an instrument name (-i) parameter must be passed.\n";
+#}
 
 # Populate the query properties hash with supplied values (DBI cleverly deals with non-
 # supplied fields in the appropriate way).
@@ -103,6 +105,7 @@ if ($lane)       { $input_values{LANE} = $lane; }
 if ($pair)       { $input_values{PAIR} = $pair; }
 if ($barcode)    { $input_values{BARCODE} = $barcode; }
 if ($sample)     { $input_values{SAMPLE_NAME} = $sample; }
+$input_values{TOOL} = 'FastQC';
 
 # Handle date-times, if any are supplied as inputs
 if ($begindate || $enddate) {
@@ -119,7 +122,7 @@ if ($begindate || $enddate) {
 chomp $queryscope;
 $queryscope =~ s/\'//g;
 $queryscope = lc $queryscope;
-unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^na$/) {
+unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^pair$|^na$/) {
   die "Query scope should be set to one of:\ninstrument\nrun\nlane\nsample_name\nbarcode\nread\nor left unset\n";
 }
 if ($queryscope =~ /sample/) { $queryscope = 'sample_name'; }
@@ -159,27 +162,23 @@ else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions(\%input_values);
   my $avg = $qry->to_csv;
-  my @returned_values = split /\s/, $avg;
-  my $colheads = shift @returned_values;
-  my @column_headers = split /,/, $colheads;
-  
-  print "@column_headers\n";
+  my ($column_headers,$returned_values) = parse_query_results(\$avg);
+  print "@$column_headers\n";
   
   # Make returned column headers upper-case so they match the hash keys used
   # in the API
-  foreach my $k (@column_headers) {
+  foreach my $k (@$column_headers) {
     $k = uc $k;
   }
   
   my $n = 0;
-  foreach my $query_set (@returned_values) {
+  foreach my $query_set (@$returned_values) {
     $n ++;
-    my @qry_vals = split /,/, $query_set;
-    my @keys = @column_headers;
     my %qry = ();
-    while (@qry_vals) {
-      my $val = shift @qry_vals;
-      my $key = shift @keys;
+    for my $i (1..@$column_headers) {
+      $i --;
+      my $val = $query_set->[$i];
+      my $key = $column_headers->[$i];
       if ($val) { $qry {$key} = $val; }
     }
     
@@ -220,17 +219,15 @@ foreach my $query_set (@query_sets) {
   # Those come from passing the relevant data to get_average_values
   my $qry = $reports->get_average_values(\%query_properties);
   my $avg = $qry->to_csv;
-  my @returned_values = split /\n/, $avg;
-  shift @returned_values;
+  my ($column_headers,$returned_values) = parse_query_results(\$avg);
   
   # Rows: min seq length, total seqs, gc content, filtered seqs, max seq length,
   # total duplicate read percentage
   # Set up summary data hash to store this (and other) properties of this query set
   my %summarydata = ();
-  foreach my $row (@returned_values) {
-    my @dat = split /,/, $row;
-    my $desc = $dat [0];
-    my $val  = $dat [1];
+  foreach my $row (@$returned_values) {
+    my $desc = $row->[0];
+    my $val  = $row->[1];
     $summarydata {$desc} = $val;
   }
   
@@ -242,7 +239,7 @@ foreach my $query_set (@query_sets) {
   $qry = $reports->get_analysis_id(\%query_properties);
   $avg = $qry->to_csv;
   @analysis_ids = split /\s/, $avg;
-  my $headers = shift @analysis_ids;
+  
   
   # Add filename and file type to %summarydata by querying the analysis_property
   # table. 
@@ -250,14 +247,13 @@ foreach my $query_set (@query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  
-  @returned_values = split /\n/, $avg;
-  $headers = shift @returned_values;
+  ($column_headers,$returned_values) = parse_query_results(\$avg);
+  @$returned_values = split /\n/, $avg;
   
   print "Querying analysis properties\nPROPERTY,VALUE\n";
-  foreach my $line (@returned_values) {
-    my @sp = split /,/, $line;
-    my $property = $sp [0]; my $value = $sp [1];
+  foreach my $line (@$returned_values) {
+    my $property = $line->[0];
+    my $value = $line->[1];
     
     # Prevent this from producing entries for data that is actually missing.
     # (E.g., barcodes, frequently)
@@ -334,18 +330,14 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my @returned_values = split /\s/, $dat;
+    my ($column_headers,$returned_values) = parse_query_results(\$dat);
     
-    my $column_headers = shift @returned_values;
-    print "$column_headers\n";
+    print "@$column_headers\n";
     
-    if (@returned_values >= 1) {
-      foreach my $rv (@returned_values) {
-        $rv =~ s/,/\t/g;
-        
+    if (@$returned_values >= 1) {
+      foreach my $row (@$returned_values) {
         # Do something about the large number of decimal places. 3 ought to be plenty.
-        my @dat = split /\t/, $rv;
-        foreach my $val (@dat) {
+        foreach my $val (@$row) {
           unless ($val =~ /[[:alpha:]]/) {
             if ($val != int $val) {
               $val = sprintf '%.3f', $val;
@@ -355,7 +347,7 @@ foreach my $query_set (@query_sets) {
         
         # Store the base interval of this particular record
         # Give as an interval, if possible.
-        my $basepos = $dat [0];
+        my $basepos = $row->[0];
         my $interval_name = $basepos;
         if ($base_intervals [-1]) {
           if ($base_intervals [-1] < ($basepos - 1)) {
@@ -368,9 +360,9 @@ foreach my $query_set (@query_sets) {
         # Store the actual data in a hash of arrays, according to type
         # (It's pretty easy to retrieve later)
         # Column 3 holds the data.
-        push @{$qualdata{$valtype}}, $dat [2];
+        push @{$qualdata{$valtype}}, $row->[2];
         
-        my $pout = join "\t", @dat;
+        my $pout = join "\t", @$row;
         print "$pout\n";
       }
       print "\n-----\n";
@@ -399,22 +391,18 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my @returned_values = split /\s/, $dat;
+    my ($column_headers,$returned_values) = parse_query_results(\$avg);
     
-    my $column_headers = shift @returned_values;
-    print "$column_headers\n";
+    print "@$column_headers\n";
     
     # X axis values for these plots are single figures, rather than
     # intervals. That means no other manipulation is necessary.
     my @xvals = ();
     
-    if (@returned_values >= 1) {
-      foreach my $rv (@returned_values) {
-        $rv =~ s/,/\t/g;
-        
+    if (@$returned_values >= 1) {
+      foreach my $row (@$returned_values) {
         # Do something about the large number of decimal places. 3 ought to be plenty.
-        my @dat = split /\t/, $rv;
-        foreach my $val (@dat) {
+        foreach my $val (@$row) {
           unless ($val =~ /[[:alpha:]]/) {
             if ($val != int $val) {
               $val = sprintf '%.3f', $val;
@@ -424,16 +412,16 @@ foreach my $query_set (@query_sets) {
         
         # Store the base interval of this particular record
         # Give as an interval, if possible.
-        my $xval = $dat [0];
+        my $xval = $row->[0];
         push @xvals, $xval;
-    # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
+        # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
         
         # Store the actual data in a hash of arrays, according to type
         # (It's pretty easy to retrieve later)
         # Column 3 holds the data.
-        push @{$qualdata{$valtype}}, $dat [2];
+        push @{$qualdata{$valtype}}, $row->[2];
         
-        my $pout = join "\t", @dat;
+        my $pout = join "\t", @$row;
         print "$pout\n";
       }
       
@@ -449,18 +437,15 @@ foreach my $query_set (@query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  @returned_values = split /\n/, $dat;
-  my $column_headers = shift @returned_values;
+  ($column_headers,$returned_values) = parse_query_results(\$avg);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
-  foreach my $ors (@returned_values) {
-    $ors =~ s/,/\t/g;
+  foreach my $ors (@$returned_values) {
+    my $seq = $ors->[0];
     
-    my @sp = split /\t/, $ors;
-    my $seq = shift @sp;
-    
-    for (1..3) { pop @sp; }
-    my $comment = join ' ', @sp;
+    my @shorten_row = @$ors;
+    for (1..4) { pop @shorten_row; }
+    my $comment = join ' ', @shorten_row;
     print "$seq";
     if ($comment) { print "\t$comment"; }
     print "\n";
@@ -469,7 +454,7 @@ foreach my $query_set (@query_sets) {
     if ($comment) { push @{$overrepresented_sequences{"comments"}}, $comment; }
     else          { push @{$overrepresented_sequences{"comments"}}, " "; }
   }
-  if (@returned_values == 0) {
+  if (@$returned_values == 0) {
     print "None\n";
   }
   
@@ -545,4 +530,29 @@ sub remove_duplicates {
   }
   
   return @out;
+}
+
+
+sub parse_query_results {
+  # Dealing with the csv data returned from a query requires several
+  # lines of scruffy code. This sub takes care of it much more neatly.
+  # Pass in a query results object and get back two array references:
+  # first, the column headers;
+  # second, an array of values per row, split on comma (since csv). 
+  my $in_ref = $_ [0];
+  my $in_string = $$in_ref;
+  
+  my @returned_values = split /\s/, $in_string;
+  
+  # The first line of this table is always the column headers
+  my $column_headers = shift @returned_values;
+  my @col_heads = split /,/,$column_headers;
+  
+  my @results = ();
+  foreach my $rv (@returned_values) {
+    my @dat = split /,/, $rv;
+    push @results, \@dat;
+  }
+  
+  return (\@col_heads, \@results);
 }
