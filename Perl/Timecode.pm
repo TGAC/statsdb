@@ -1,6 +1,10 @@
 package Timecode;
 use strict;
 
+# This module is designed to handle the date- and timestamps passed
+# to the consumer scripts when searching for data between given
+# time-points.
+
 sub parse_input_date {
   # Wrangle the supplied dates - probably in the sensible DD/MM/YYYY format
   # - into the timestamp format used when talking to the database.

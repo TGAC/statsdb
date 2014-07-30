@@ -303,6 +303,23 @@ sub list_all_runs {
   return Reports::ReportTable->new($sth);
 }
 
+sub get_runs_between_dates() {
+  # Retrieves runs that were inserted into the database between two given timepoints
+  # Note that since the actual time of the analysis is recorded, this data will change
+  # if the database is repopulated.
+  
+  my $self = shift;
+  my $date1 = shift;
+  my $date2 = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "CALL select_runs_between_dates(?, ?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($date1, $date2);
+
+  return Reports::ReportTable->new($sth);
+}
+
 sub list_lanes_for_run() {
   # This uses a less generalist function than the previous two subs
   # to return the lanes in a run 
