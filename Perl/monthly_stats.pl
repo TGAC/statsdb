@@ -61,13 +61,13 @@ Calling StatsDB Perl consumer with command line options:
                       (If -b supplied and -e not, all data between
                        -b [date] and current time is returned)
 Examples:
-- Query between two dates (most common usage):
- perl monthly_stats.pl -d examples/live_db.txt -b \"15/7/13\" -e \"30/7/2013\"
+- Query between two dates:
+ perl monthly_stats.pl -d examples/template_db.txt -b \"15/7/13\" -e \"30/7/2013\"
 
 - Query between two dates, also specifying times:
- perl monthly_stats.pl -d examples/live_db.txt -b \"15/7/13 17:19:21\" -e \"30/7/2013 18:00:36\"
+ perl monthly_stats.pl -d examples/template_db.txt -b \"15/7/13 17:19:21\" -e \"30/7/2013 18:00:36\"
 
-Note that doublequotes around date-time values are recommended.
+Note that double-quotes around date/time values are recommended.
 -----
 Output consists of a list of runs, followed by a simple table listing
 summary statistics.
@@ -146,8 +146,8 @@ foreach my $runID (@runs_in_range) {
     # only for Illumina runs at the moment, since Illumina read length is fixed
     # to the value in this field.
     if ($desc eq 'general_max_length') {
-      $thisrun_readlength = $avg;
-      $thisrun_bases = $thisrun_seqs * $avg;
+      $thisrun_readlength = $average;
+      $thisrun_bases = $thisrun_seqs * $average;
       $total_bases += $thisrun_bases;
     }
     
@@ -179,12 +179,12 @@ foreach my $runID (@runs_in_range) {
 # Start outputting the retrieved figures here
 print "\n\nTOTALS
 Runs\t\t$total_runs
-Bases\t\t$total_bases (".mean(\@numbases)." +/- ".(stdev(\@numbases) * 2)." per run)
-Sequences\t$total_sequences (".mean(\@numseqs)." +/- ".(stdev(\@numseqs) * 2)." per run)
-Samples\t\t$total_samples (".int mean(\@numsamples)." per run)
+Bases\t\t$total_bases (".mean(\@numbases)." +/- ".(int stdev(\@numbases) * 2)." per run)
+Sequences\t$total_sequences (".(int mean(\@numseqs))." +/- ".(int stdev(\@numseqs) * 2)." per run)
+Samples\t\t$total_samples (".(int mean(\@numsamples))." per run)
 
 AVERAGES
-Read length\t".int mean(\@readlengths)."\n\n";
+Read length\t".(int mean(\@readlengths))."\n\n";
 
 #Phred quality\t".."
 #Error rate\t".."
@@ -218,12 +218,13 @@ sub stdev {
   }
   
   my $mean = mean($in);
-  my $sqtotal = 0;
+  my @sq_dfms = ();
   foreach my $i (@$in) {
-    $sqtotal += ($mean - $i) ** 2;
+    my $sq_dfm = ($mean - $i) ** 2;
+    push @sq_dfms, $sq_dfm;
   }
   
-  my $std = ($sqtotal / (@$in - 1)) ** 0.5;
+  my $std = sqrt mean(\@sq_dfms);
   return $std;
 }
 

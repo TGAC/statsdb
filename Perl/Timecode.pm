@@ -11,7 +11,7 @@ sub parse_input_date {
   my $indate = $_[0];
   
   # Date may not be set. If it isn't set, fill it up with the present time.
-  if (!$indate) { $indate = present_time(); }
+  if (!$indate) { $indate = present_timestamp(); }
   
   # Date may be supplied with a time code as well.
   # If it is, it should be checked, set aside and added back on later.
@@ -36,17 +36,6 @@ sub add_leading_zeros {
   return $string;
 }
 
-sub present_date {
-  # Returns the current date, in this format:
-  # 30-7-2013 (day-month-year)
-  my ($sec, $min, $hour, $mday, $mon, $year, $wday, $yday, $isdst) = localtime (time);
-  $year += 1900;
-  $mon ++;
-  
-  #return localtime (date);
-  return "$mday-$mon-$year";
-}
-
 sub present_time {
   # Returns the current time and date, in this format:
   # 18:00:36 (hour:min:sec)
@@ -55,7 +44,7 @@ sub present_time {
   $mon ++;
   
   #return localtime (time);
-  return "$hour:$min:$sec";
+  return "$mday-$mon-$year $hour:$min:$sec";
 }
 
 sub check_date_input_format {
@@ -74,7 +63,7 @@ sub check_date_input_format {
   
   # The above does not make a few other checks for obviously silly values resulting from typos and such
   my ($inday, $inmon, $inyr) = split /\/|\-/, $indate;
-  my ($day, $mnt, $yr, $time) = split / /, present_time();
+  my ($day, $mnt, $yr, $time) = split /[\s\-]/, present_time();
   if ($inday > 31) { die "Probable typo: input day number ($inday) greater than 31\n\n"; }
   if ($inmon > 12) { die "Probable typo: month number ($inmon) greater than 12\n\n"; }
   if ($inyr) {
