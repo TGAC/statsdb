@@ -30,7 +30,7 @@ my $config = $arguments{db_config};
 my $db = QCAnalysis::DB->new();
 #QCAnalysis::RunTable->add_header_scope("barcode", "analysis");
 
-my @analysis =  QCAnalysis::RunTable->parse_file($input); 
+my @analysis = QCAnalysis::RunTable->parse_file($input); 
 
 $db->connect($config);
 

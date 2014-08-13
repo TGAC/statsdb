@@ -1,5 +1,6 @@
 package QCAnalysis;
 use strict;
+use Storable;
 
 =head1 QCAnalysis
 
@@ -31,6 +32,21 @@ sub new {
 				};
 	bless $self, $class;
 	return $self;
+}
+
+=head3 $new_analysis = $qc_analysis->clone($original_analysis)
+
+Creates a copy of an existing analysis object
+
+=cut
+
+sub clone {
+	my $self = shift;
+	#my $original = shift;
+	
+	#my $new = Storable::dclone($original);
+	my $new = Storable::dclone($self);
+	return $new;
 }
 
 =head3 $qc_analysis->add_property($key, $value)
@@ -75,7 +91,7 @@ sub add_partition_value{
 	my $value = shift;
 	
 	(my $position, my $size) = pos_size_from_range($range);
-
+	
 #TODO: Validate that the type is supported by the class. 
 	my $partitions = $self->{partition_value};
 	my $arr = [$position, $size, $key, $value];

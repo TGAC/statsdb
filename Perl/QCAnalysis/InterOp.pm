@@ -4,18 +4,13 @@ use strict;
 no strict "refs";
 use IO::File;
 use Bio::IlluminaSAV;
+use Storable;
 
-
-# Best thing, rather than doing a separate initial parser, would be compatibility
-# with parse_analyses.pl. (That should be modified to be able to recognise an
-# InterOp option, and to pass the supplied directory in here).
-# That means I should be able to deal with the directory rather than one file at a
-# time.
-
-# Note: to fit the InterOp data into the schema of StatsDB, I plan on creating a quite
-# large number of individual entries - one analysis for each set of data type, read and
-# lane. These will all be returned via an array, and can be inserted into the database
-# individually.
+# This module is a bit bigger than the other parsers, since it must also
+# produce summary stats for the InterOp data. The InterOp files are far too
+# large to insert into the DB whole, so must be summarised.
+# This is made rather more difficult by the differences in formatting between
+# the various InterOp files.
 
 # Check, once I'm getting closer, if these could be knocked down to my
 our %interop_values;
@@ -26,7 +21,7 @@ my @pairs;
 my %database_pairids = ();
 my $run_directory;
 my @InterOp_files;
-my @bases = [ 'N', 'A', 'C', 'G', 'T' ];
+my @bases = ('N', 'A', 'C', 'G', 'T');
 my %read_ends = ();
 
 # I want a couple of reasonable options in terms of input:
@@ -86,8 +81,6 @@ sub parse_file {
   
   my $generic_analysis = shift;
   
-  #print "SUB PARSE_FILE\n";
-  
   # $data should be reset, or the amount of data read in from the SAV files causes
   # system memory to fill up quickly and pointlessly.
   $data = ();
@@ -142,7 +135,10 @@ sub parse_file {
   # here, we learn how to handle the data in it.
   my $data_classification = $file;
   $data_classification =~ s/Out.bin//g;
-  $generic_analysis->add_property ("data_classification", $data_classification);
+  #$generic_analysis->add_property ("data_classification", $data_classification);
+  # Try storing this property as 'encoding', since that's an appropriate term for
+  # what each file holds.
+  $generic_analysis->add_property ("encoding", $data_classification);
   
   # Input comes in as a single file, but I need to output a distinct
   # object for each combination of lane, read and data type.
@@ -159,8 +155,20 @@ sub parse_file {
 	  # Each lane and read will have its own record
 	  # For example, lane 1/read 1 will be recognised as a distinct analysis,
 	  # as will lane 1/read 2
+	  # That requires cloning the oriinal analysis object supplied as input
+	  my $single_analysis = $generic_analysis->clone();
+	  $single_analysis->add_property("lane", $lane);
+	  $single_analysis->add_property("pair", $pair);
+	  print "--lane $lane, pair $pair\n";
 	  
-	  my $single_analysis = prepare_analysis_object ($run_directory, $file, $lane, $pair, $generic_analysis);
+	  parse_data($file, $single_analysis);
+	  
+	  #my $single_analysis = prepare_analysis_object($run_directory, $file, $lane, $pair, $generic_analysis);
+	  
+	  # Now that I've extracted and sorted out the data for this
+	  # analysis, I should change its read identifier to the human-readable version
+	  # rather than the InterOp version (use %database_pairids)
+	  $single_analysis->add_property("pair", $database_pairids{$pair});
 	  
 	  # parse_files returns a hash reference structure if it is successful;
 	  # otherwise, it returns a string.
@@ -170,53 +178,80 @@ sub parse_file {
 	}
   }
   
+  
+#  
+#  
+#  
+#  # OK, OK - final lunacy check. Then I can pack this off once and for all. 
+#  # Does the object I just created have the data I expect?
+#  # Does it have the right read numbers?
+#  # Is the data in each lane... not identical?
+#  foreach my $out_analysis (@analyses) {
+#	my $pair = $out_analysis->get_property("pair");
+#	my $lane = $out_analysis->get_property("lane");
+#	my $encoding = $out_analysis->get_property("encoding");
+#	
+#	my $partvals = $out_analysis->get_partition_values();
+#	
+#	print "$encoding, lane $lane pair $pair --- $partvals\n";
+#  }
+#  
+#  my $oirgnonermg = <STDIN>;
+#  
+#  
+#  
+#  
+  
+  
+  
   return \@analyses;
 }
 
 
-sub prepare_analysis_object {
-  my $run_directory = shift;
-  my $file = shift;
-  my $lane = shift;
-  my $pair = shift;
-  my $generic_analysis = shift;
-  
-  #print "SUB prepare_analysis_object\n";
-  
-  # Previous subs have dealt with constructing the set of objects that will be
-  # necessary given the data at hand.
-  # This sub sets off the hard work of actually retrieving and filling a given
-  # object with data from a given file.
-  
-  # I want to clone $generic_analysis, not just copy the pointer.
-  # Create a local copy in this scope. This suffices for the scale of the hash
-  # in its present state.
-  # (I.e., it works because it's not a recursive structure)
-  my %localcopy = %$generic_analysis;
-  my $specific_analysis = \%localcopy;
-  bless $specific_analysis, "QCAnalysis";
-  # Add these things as data using add_header_scope and add_property
-  # Use add_valid_type to add value_types
-  # Use add_property to add analysis_property things
-  # NOTE for when you want to get at these:
-  # use get_property
-  #$specific_analysis->add_property ("tile", $tile);
-  $specific_analysis->add_property("lane", $lane);
-  $specific_analysis->add_property("pair", $pair);
-  print "  lane $lane, pair $pair\n";
-  
-  # This might not do anything. Be ready to remove it.
-  #RunTable->add_header_scope("barcode", "analysis");
-  
-  parse_data($file, $specific_analysis);
-  
-  # Now that I've extracted and sorted out the data for this
-  # analysis, I should change its read identifier to the human-readable version
-  # rather than the InterOp version (use %database_pairids)
-  $specific_analysis->add_property ("pair", $database_pairids{$pair});
-  
-  return $specific_analysis;
-}
+# ATTEMPTING TO BYPASS THIS
+#sub prepare_analysis_object {
+#  my $run_directory = shift;
+#  my $file = shift;
+#  my $lane = shift;
+#  my $pair = shift;
+#  my $generic_analysis = shift;
+#  
+#  # Previous subs have dealt with constructing the set of objects that will be
+#  # necessary given the data at hand.
+#  # This sub sets off the hard work of actually retrieving and filling a given
+#  # object with data from a given file.
+#  
+#  # I want to clone $generic_analysis, not just copy the pointer.
+#  # Create a local copy in this scope. This suffices for the scale of the hash
+#  # in its present state.
+#  # (I.e., it works because it's not a recursive structure)
+#  #my %localcopy = %$generic_analysis;
+#  #my $specific_analysis = \%localcopy;
+#  #bless $specific_analysis, "QCAnalysis";
+#  
+#  #my $specific_analysis = Storable::dclone($generic_analysis);
+#  #bless $specific_analysis, "QCAnalysis";
+#  
+#  my $specific_analysis = $generic_analysis->clone();
+#  
+#  
+#  # Add these things as data using add_header_scope and add_property
+#  # Use add_property to add analysis_property things
+#  # NOTE for when you want to get at these:
+#  # use get_property
+#  $specific_analysis->add_property("lane", $lane);
+#  $specific_analysis->add_property("pair", $pair);
+#  print "--lane $lane, pair $pair\n";
+#  
+#  parse_data($file, $specific_analysis);
+#  
+#  # Now that I've extracted and sorted out the data for this
+#  # analysis, I should change its read identifier to the human-readable version
+#  # rather than the InterOp version (use %database_pairids)
+#  #$specific_analysis->add_property("pair", $database_pairids{$pair});
+#  
+#  return $specific_analysis;
+#}
 
 sub read_ids_and_lengths {
   # I want the start and end of each read available.
@@ -225,27 +260,11 @@ sub read_ids_and_lengths {
   
   # Key is Interop readID and 'start' or 'end', values are start and end
   # of the read
-  #my $data = shift;
-  
-  #$data->{info} = $savs->run_info();
-  
-  # This is wrong - pair values are getting hash addresses, not numbers!
-  
   my $reads = $data->{info}{reads};
-  #@pairs = @$reads;
-  
-  #print "SUB read_ids_and_lengths\n";
   
   # Read numbers are one of the values in each of the hashes stored in @$pairs
-  # Commented code was used to show exactly what is going on here.
-  #my $n = 0;
   @pairs = ();
   foreach my $p (@$reads) {
-	#$n ++;
-	#print "   PAIR $n, $p\n";
-	#foreach my $k (keys %$p) {
-	#  print "     key $k\tval $p->{$k}\n";
-	#}
 	push @pairs, $p->{readnum};
   }
   
@@ -273,25 +292,15 @@ sub get_run_id {
   # When passed the run directory, this returns the run ID.
   # Works only on UNIX-style directories at the moment.
   my $rundir = shift;
-  
-  #print "SUB get_run_id\n";
-  
   my @dirs = split /\//, $rundir;
   return $dirs [-1];
 }
 
 sub read_file {
-  #my $class = shift;
   my $file = shift;
   my $rundir = shift;
-  #my $analysis = shift;
-  
-  #print "SUB read_file\n";
-  
   # Which SAV file is it? Read the first part of the filename to find out, and
   # then send it off to the appropriate sub to get the data out of it.
-  #my $savs = Bio::IlluminaSAV -> new($rundir);
-  
   my $parse_function = $file;
   $parse_function =~ s/Out.bin//g;
   if (defined &{$parse_function}){
@@ -301,123 +310,70 @@ sub read_file {
   }
 }
 
-# FastQC.pm has a hash that sets up a classification for all the data types expected in
-# a FastQC report (assigning each data type to a type_scope).
-# I should set up something similar for Interop data.
-
-# This sub should centre around using add_valid_type to construct stuff into the
-# object.
-
-
-# Instead of feeding these all back into one generic method, why don't I
-# just deal with each type independently here, and instead call generic
-# methods from within these?
-# Then, later on, when it goes back to the parser, I can have this data in a
-# common format, already filtered, or whatever.
-# Or just add it to the object as it comes. Whatevs.
-
-# I think tiles can be added as a value_type. Maybe. Probably not, since there are
-# multiple data types per tile ID...
-# Unless...
-# Each data type was listed as a different tool, or at least given a different value
-# for 'encoding' or something. This would cause each set of data to be stored as a
-# single analysis, allowing the tile IDs to be stored as value_types, and for the
-# data to therefore fit into the database. Woooo!
+# These functions all deal with retrieving the data from SAV files into memory.
+# I keep them separate like this in order to avoid loading all files into memory at once.
+# That turns out to be a significant and unnecessary drain on resources.
 
 sub RunInfo {
   my $rundir = shift;
-  
-  #print "SUB RunInfo\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{info} = $sav->run_info();
 }
 
 sub NumLanes {
   my $rundir = shift;
-  
-  #print "SUB NumLanes\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   return $sav->num_lanes();
 }
 
 sub ControlMetrics {
   my $rundir = shift;
-  
-  #print "SUB ControlMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{ControlMetrics} = $sav->control_metrics();
 }
 
 sub CorrectedIntMetrics {
   my $rundir = shift;
-  
-  #print "SUB CorrectedIntMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{CorrectedIntMetrics} = $sav->corrected_int_metrics();
 }
 
 sub ErrorMetrics {
   my $rundir = shift;
-  
-  #print "SUB ErrorMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{ErrorMetrics} = $sav->error_metrics();
 }
 
 sub ExtractionMetrics {
   my $rundir = shift;
-  
-  #print "SUB ExtractionMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{ExtractionMetrics} = $sav->extraction_metrics();
 }
 
 sub ImageMetrics {
   my $rundir = shift;
-  
-  #print "SUB ImageMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{ImageMetrics} = $sav->image_metrics();
 }
 
 sub QMetrics {
   my $rundir = shift;
-  
-  #print "SUB QMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{QMetrics} = $sav->quality_metrics();
 }
 
 sub TileMetrics {
   my $rundir = shift;
-  
-  #print "SUB TileMetrics\n";
-  
-  my $sav = Bio::IlluminaSAV -> new($rundir);
+  my $sav = Bio::IlluminaSAV->new($rundir);
   $data->{TileMetrics} = $sav->tile_metrics();
 }
 
 sub parse_data {
-  # To be clear here: I've already read the file in; I now want a
-  # generalised method of establishing an object that can be passed on to
-  # the database entry method.
+  # To be clear: I've already read the file in; I now want a generalised method of
+  # establishing an object that can be passed on to the database entry method.
   my $file = shift;
   my $analysis = shift;
   
-  #print "SUB parse_data\n";
-  
-  # I'm thinking having some 'average across cycle' and 'cluster several lanes'
-  # functions as well, since that should vastly cut down the amount of data that
-  # has to be stored, simplifying its storage and access in the process.
-  # Maybe only 'average across cycle'. Maybe not even that.
   my $parse_function = $file;
   $parse_function =~ s/Out.bin//g;
   $parse_function = "parse_".$parse_function;
@@ -427,8 +383,6 @@ sub parse_data {
   }else{
 	print "WARN: No parse function:  " . $parse_function . "\n";
   }
-  
-  #my @fields = @{$metrics{$parse_function}};
 }
 
 # Write functions to deal with each specific data type
@@ -437,13 +391,16 @@ sub parse_ControlMetrics {
   my $analysis = shift;
   my $lines = $data->{ControlMetrics};
   
-  #print "SUB parse_ControlMetrics\n";
-  
   # This data MAY not normally contain anything.
   # That may cause problems. Try to anticipate it.
   # (If that fails, just skip this file; it doesn't have anything we would
   # normally be very interested in anyway.)
   # It MAY also be better stored as analysis properties. CHECK.
+  
+  # Add the data series encountered here as valid types
+  #$analysis->add_valid_type("control_name", "");
+  #$analysis->add_valid_type("index_name", "");
+  #$analysis->add_valid_type("control_clusters", "");
   
   # Remember, we're after a given lane and read only from this data.
   my $pair = $analysis->get_property("pair");
@@ -453,7 +410,7 @@ sub parse_ControlMetrics {
   
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -469,15 +426,15 @@ sub parse_ControlMetrics {
 	# Deal with the various series in this file
 	my $series_name = "control_name";
 	my $val = $line->{$series_name};
-	push @{$relevant_data->{$series_name}}, $val;
+	push @{$relevant_data{$series_name}}, $val;
 	
 	$series_name = "index_name";
 	$val = $line->{$series_name};
-	push @{$relevant_data->{$series_name}}, $val;
+	push @{$relevant_data{$series_name}}, $val;
 	
 	$series_name = "control_clusters";
 	$val = $line->{$series_name};
-	push @{$relevant_data->{$series_name}}, $val;
+	push @{$relevant_data{$series_name}}, $val;
   }
   
   # O-kaaaaay.
@@ -489,10 +446,10 @@ sub parse_ControlMetrics {
   # Sort it out later.
   
   
-  if ($relevant_data->{control_name}) {
+  if ($relevant_data{control_name}) {
 	# Get an array (ref) of all the deduplicated control names and index names
-	my $control_name = remove_duplicates($relevant_data->{control_name});
-	my $index_names = remove_duplicates($relevant_data->{index_name});
+	my $control_name = remove_duplicates($relevant_data{control_name});
+	my $index_names = remove_duplicates($relevant_data{index_name});
 	
 	# If the returned arrays have only one thing, add as a properties.
 	# If the returned arrays have multiple things, throw an error - the input has not been
@@ -504,7 +461,7 @@ sub parse_ControlMetrics {
   
 #  foreach my $series (keys $relevant_data) {
 #	my ($mean, $stdev) = summary_stats($relevant_data->{$series});
-#	insert_into_database($analysis, $series, $mean, $stdev);
+#	add_data_series_to_object($analysis, $series, $mean, $stdev);
 #  }
   
   
@@ -516,17 +473,28 @@ sub parse_CorrectedIntMetrics {
   my $analysis = shift;
   my $lines = $data->{CorrectedIntMetrics};
   
-  #print "SUB parse_CorrectedIntMetrics\n";
-  
   # Remember, we're after a given lane and read only from this data.
   my $pair = $analysis->get_property("pair");
   my $lane = $analysis->get_property("lane");
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
   
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev') {
+	$analysis->add_valid_type("avg_intensity_$type", "base_position");
+	foreach my $base ('a', 'c', 'g', 't') {
+	  $analysis->add_valid_type("avg_corrected_int_$base\_$type", "base_position");
+	  $analysis->add_valid_type("avg_called_int_$base\_$type", "base_position");
+	}
+  }
+  foreach my $type ('mean', 'stdev', 'max', 'upper_quartile', 'median', 'lower_quartile', 'min') {
+	$analysis->add_valid_type("snr_$type", "base_position");
+  }
+  $analysis->add_valid_type("num_basecalls", "base_position");
+  
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -550,43 +518,37 @@ sub parse_CorrectedIntMetrics {
 	}
 	
 	# Deal with the various series in this file
-	parse_single_value ("avg_intensity", $cycle, $line, $relevant_data);
-	parse_perbase_arrayref("avg_corrected_int", $cycle, $line, $relevant_data);
-	parse_perbase_arrayref("avg_called_int", $cycle, $line, $relevant_data);
-	parse_single_value("snr", $cycle, $line, $relevant_data);
-	parse_perbase_arrayref("num_basecalls", $cycle, $line, $relevant_data);
+	parse_single_value ("avg_intensity", $cycle, $line, \%relevant_data);
+	parse_perbase_arrayref("avg_corrected_int", $cycle, $line, \%relevant_data);
+	parse_perbase_arrayref("avg_called_int", $cycle, $line, \%relevant_data);
+	parse_single_value("snr", $cycle, $line, \%relevant_data);
+	parse_perbase_arrayref("num_basecalls", $cycle, $line, \%relevant_data);
   }
   
-  # The data we want is now stored in $relevant_data.
+  # The data we want is now stored in %relevant_data.
   # Get summary stats for each series
-  foreach my $series (keys %$relevant_data) {
+  foreach my $series (keys %relevant_data) {
 	my ($mean, $stdev, $spread) = ();
 	if ($series =~ /num_basecalls/) {
 	  # num_basecalls series (there are 5) should be added up and treated as a single value
 	  # per cycle
 	  foreach my $cycle ($first_cycle..$last_cycle) {
-		$mean->[$cycle] = sum($relevant_data->{$series}{$cycle});
+		$mean->[$cycle] = sum($relevant_data{$series}{$cycle});
 	  }
 	}
 	else {
-	  ($mean, $stdev)= summary_stats($relevant_data->{$series});
+	  ($mean, $stdev)= summary_stats($relevant_data{$series});
 	  if ($series eq 'snr') {
-		$spread = median_range_and_quartiles($relevant_data->{$series});
+		$spread = median_range_and_quartiles($relevant_data{$series});
 	  }
 	}
-	insert_into_database($analysis, $series, $mean, $stdev, $spread);
+	add_data_series_to_object($analysis, $series, $mean, $stdev, $spread);
   }
 }
 
 sub parse_ErrorMetrics {
   my $analysis = shift;
   my $lines = $data->{ErrorMetrics};
-  
-  #print "SUB parse_ErrorMetrics\n";
-  
-  
-  #Something in here is causing OOM errors.
-  
   
   # Remember, we're after a given lane and read only from this data.
   my $pair = $analysis->get_property("pair");
@@ -595,9 +557,14 @@ sub parse_ErrorMetrics {
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
   
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev', 'max', 'upper_quartile', 'median', 'lower_quartile', 'min') {
+	$analysis->add_valid_type("err_rate_$type", "base_position");
+  }
+  
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -612,22 +579,20 @@ sub parse_ErrorMetrics {
 	}
 	
 	# Deal with the various series in this file
-	parse_single_value ("err_rate", $cycle, $line, $relevant_data);
-	parse_perbase_arrayref ("avg_corrected_int", $cycle, $line, $relevant_data);
-	
-	# cif_datestamp and cif_timestamp are ignored here because these data are already
-	# written into the database from another source.
+	parse_single_value ("err_rate", $cycle, $line, \%relevant_data);
+	#parse_perbase_arrayref ("avg_corrected_int", $cycle, $line, $relevant_data);
   }
   
   # The data we want is now stored in $relevant_data.
   # Get summary stats for each series
-  foreach my $series (keys %$relevant_data) {
-	my ($mean, $stdev) = summary_stats($relevant_data->{$series});
+  foreach my $series (keys %relevant_data) {
+	#print "SERIES: $series\n";
+	my ($mean, $stdev) = summary_stats($relevant_data{$series});
 	my $spread = ();
 	if ($series =~ /err_rate/) {
-	  $spread = median_range_and_quartiles($relevant_data->{$series});
+	  $spread = median_range_and_quartiles($relevant_data{$series});
 	}
-	insert_into_database ($analysis, $series, $mean, $stdev, $spread);
+	add_data_series_to_object($analysis, $series, $mean, $stdev, $spread);
   }
 }
 
@@ -635,17 +600,23 @@ sub parse_ExtractionMetrics {
   my $analysis = shift;
   my $lines = $data->{ExtractionMetrics};
   
-  #print "SUB parse_ExtractionMetrics\n";
-  
   # Remember, we're after a given lane and read only from this data.
   my $pair = $analysis->get_property("pair");
   my $lane = $analysis->get_property("lane");
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
   
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev') {
+	foreach my $base ('a', 'c', 'g', 't') {
+	  $analysis->add_valid_type("fwhm_$base\_$type", "base_position");
+	  $analysis->add_valid_type("intensities_$base\_$type", "base_position");
+	}
+  }
+  
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -660,16 +631,19 @@ sub parse_ExtractionMetrics {
 	}
 	
 	# Deal with the various series in this file
-	parse_perbase_arrayref ("fwhm", $cycle, $line, $relevant_data);
-	parse_perbase_arrayref ("intensities", $cycle, $line, $relevant_data);
+	parse_perbase_arrayref ("fwhm", $cycle, $line, \%relevant_data);
+	parse_perbase_arrayref ("intensities", $cycle, $line, \%relevant_data);
+	
+	# cif_datestamp and cif_timestamp are ignored here because these data are already
+	# written into the database from another source.
   }
   
   # The data we want is now stored in $relevant_data.
   # Get summary stats for each series
   # Nope, I want PER-CYCLE here
-  foreach my $series (keys %$relevant_data) {
-	my ($mean, $stdev) = summary_stats ($relevant_data->{$series});
-	insert_into_database ($analysis, $series, $mean, $stdev);
+  foreach my $series (keys %relevant_data) {
+	my ($mean, $stdev) = summary_stats ($relevant_data{$series});
+	add_data_series_to_object($analysis, $series, $mean, $stdev);
   }
   
 }
@@ -678,17 +652,25 @@ sub parse_ImageMetrics {
   my $analysis = shift;
   my $lines = $data->{ImageMetrics};
   
-  #print "SUB parse_ImageMetrics\n";
-  
   # Remember, we're after a given lane and read only from this data.
   my $pair = $analysis->get_property("pair");
   my $lane = $analysis->get_property("lane");
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
   
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev') {
+	$analysis->add_valid_type("avg_intensity_$type", "base_position");
+	foreach my $base ('a', 'c', 'g', 't') {
+	  $analysis->add_valid_type("avg_corrected_int_$base\_$type", "base_position");
+	  $analysis->add_valid_type("avg_called_int_$base\_$type", "base_position");
+	}
+  }
+  $analysis->add_valid_type("num_basecalls", "base_position");
+  
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -703,29 +685,26 @@ sub parse_ImageMetrics {
 	}
 	
 	# Deal with the various series in this file
-	
-	# What, exactly, should I do with this?
-	parse_single_value ("channel_id", $cycle, $line, $relevant_data);
-	parse_single_value ("min_contrast", $cycle, $line, $relevant_data);
-	parse_single_value ("max_contrast", $cycle, $line, $relevant_data);
+	# Here, the channel ID determines which base the max and min contrast figures apply to.
+	# Standard order: 0=A, 1=C, 2=G, 3=T
+	my $base = lc $bases[$line->{channel_id} + 1];
+	push @{$relevant_data{"min_contrast_$base"}{$cycle}}, $line->{min_contrast};
+	push @{$relevant_data{"max_contrast_$base"}{$cycle}}, $line->{max_contrast};
   }
   
   # The data we want is now stored in $relevant_data.
   # Get summary stats for each series
-  foreach my $series (keys %$relevant_data) {
+  foreach my $series (keys %relevant_data) {
 	# Need to look at these data to be sure, but I'm pretty sure I just want single
 	# values here - especially for max/min contrast.
-	
-	my ($mean, $stdev) = summary_stats ($relevant_data->{$series});
-	insert_into_database ($analysis, $series, $mean, $stdev);
+	my ($mean, $stdev) = summary_stats ($relevant_data{$series});
+	add_data_series_to_object($analysis, $series, $mean, $stdev);
   }
 }
 
 sub parse_QMetrics {
   my $analysis = shift;
   my $lines = $data->{QMetrics};
-  
-  #print "SUB parse_QMetrics\n";
   
   # I only need the normal range quantifiers - but getting them is a
   # little more troublesome. Each tile's record itself contains a distribution of
@@ -739,9 +718,18 @@ sub parse_QMetrics {
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
   
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev', 'max', 'upper_quartile', 'median', 'lower_quartile', 'min') {
+	$analysis->add_valid_type("qscore_$type", "base_position");
+  }
+  $analysis->add_valid_type("percent_q20", "base_position");
+  $analysis->add_valid_type("percent_q30", "base_position");
+  
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my ($relevant_data, $q20_data, $q30_data) = ();
+  # Note - relevant_data should be a hash, in line with all other parser subs.
+  my @relevant_data = ();
+  my ($q20_data, $q30_data) = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -766,7 +754,7 @@ sub parse_QMetrics {
 		$qn--;
 		
 		# Add the current qscore to the pooled, building it up
-		$relevant_data->[$cycle][$qn] += $thistile_data->[$qn];
+		$relevant_data[$cycle][$qn] += $thistile_data->[$qn];
 		
 		# If this qscore number is >= 20 or 30, start adding up the number of runs
 		if ($qn > 20) { $q20 += $thistile_data->[$qn]; }
@@ -783,7 +771,7 @@ sub parse_QMetrics {
 		$qn--;
 		
 		# Add the current qscore to the pooled, building it up
-		$relevant_data->[$cycle][$qn] = 0;
+		$relevant_data[$cycle][$qn] = 0;
 	  }
 	  $q20_data->[$cycle] = 0;
 	  $q30_data->[$cycle] = 0;
@@ -795,7 +783,7 @@ sub parse_QMetrics {
 	# Get the mean, stdev and spread metrics for the distribution of qscores (it's a freq table)
 	# on this cycle.
 	# MEAN
-	my $qscores = $relevant_data->[$cycle];	
+	my $qscores = $relevant_data[$cycle];	
 	my $total = sum($qscores);
 	
 	my $this_cycle_mean = 0;
@@ -820,7 +808,7 @@ sub parse_QMetrics {
 	$stdev->[$cycle] = $this_cycle_stdev;
 	
 	# SPREAD
-	my $this_cycle_spread = median_range_and_quartiles($qscores);
+	my $this_cycle_spread = median_range_and_quartiles($qscores, 1);
 	
 	# Add each of the 5 summary stats to an array of arrays for that summary stat (just
 	# like I just did with mean and stdev)
@@ -829,21 +817,16 @@ sub parse_QMetrics {
 	  $spread->[$i][$cycle] = $this_cycle_spread->[$i];
 	}
   }
-  #print "       Inserting qscores\n";
-  insert_into_database ($analysis, "qscore", $mean, $stdev, $spread);
+  add_data_series_to_object($analysis, "qscore", $mean, $stdev, $spread);
   
   # Get data percent Q20/Q30 and prepare it for database insertion too.
-  #print "       Inserting q20\n";
-  insert_into_database ($analysis, "percent_q20", $q20_data);
-  #print "       Inserting q30\n";
-  insert_into_database ($analysis, "percent_q30", $q30_data);
+  add_data_series_to_object($analysis, "percent_q20", $q20_data);
+  add_data_series_to_object($analysis, "percent_q30", $q30_data);
 }
 
 sub parse_TileMetrics {
   my $analysis = shift;
   my $lines = $data->{TileMetrics};
-  
-  #print "SUB parse_TileMetrics\n";
   
   # These values are all weird - I'll have to write a whole bunch of code to deal
   # with these special cases.
@@ -856,6 +839,15 @@ sub parse_TileMetrics {
   my $lane = $analysis->get_property("lane");
   my $first_cycle = $data->{info}{reads}[$pair-1]{first_cycle};
   my $last_cycle = $data->{info}{reads}[$pair-1]{last_cycle};
+  
+  # Add the data series encountered here as valid types
+  foreach my $type ('mean', 'stdev') {
+	$analysis->add_valid_type("percentaligned_$type", "base_position");
+  }
+  foreach my $type ('mean', 'stdev', 'max', 'upper_quartile', 'median', 'lower_quartile', 'min') {
+	$analysis->add_valid_type("percentphasing_$type", "base_partition");
+	$analysis->add_valid_type("percentprephasing_$type", "base_partition");
+  }
   
   # TileMetrics aren't stored in the same way as other data - each different
   # TileMetric data type is given a numeric ID, listed below
@@ -875,7 +867,7 @@ sub parse_TileMetrics {
   
   # This essentially goes through each line in the file, but collects data only
   # for the given read and lane.
-  my $relevant_data = ();
+  my %relevant_data = ();
   LINE: foreach my $line (@$lines) {
 	# $line is a hash reference, with the folowing keys:
 	# (keys marked with a * themselves contain array references)
@@ -890,18 +882,19 @@ sub parse_TileMetrics {
 	# Deal with the various series in this file
 	my $thistile_data = $line->{metric_val};
 	my $series = $tmkeys{$line->{metric}};
-	push @{$relevant_data->{$series}}, $thistile_data;
+	push @{$relevant_data{$series}}, $thistile_data;
   }
   
   # The data we want is now stored in $relevant_data.
   # I want the mean, stdev etc.
-  foreach my $series (keys %$relevant_data) {
-	my ($mean, $stdev) = summary_stats ($relevant_data->{$series});
+  foreach my $series (keys %relevant_data) {
+	my $dat = $relevant_data{$series};
+	my ($mean, $stdev) = summary_stats($dat);
 	my $spread = ();
 	if ($series =~ /percentphasing|percentprephasing/) {
-	  $spread = median_range_and_quartiles($relevant_data->{$series});
+	  $spread = median_range_and_quartiles($dat);
 	}
-	insert_into_database ($analysis, $series, $mean, $stdev, $spread);
+	add_data_series_to_object($analysis, $series, $mean, $stdev, $spread);
   }
   
 }
@@ -913,17 +906,18 @@ sub parse_perbase_arrayref {
   my $series_name = shift;
   my $cycle = shift;
   my $line = shift;
-  my $relevant_data = shift;
-  
-  #print "SUB parse_perbase_arrayref\n";
-  
+  my $data_aggregation_ref = shift;
   my @vals = @{$line->{$series_name}};
   # Values for each base are ordered the same as bases in @bases
   foreach my $i (1..@vals) {
-	my $base = lc $bases [-$i];
-	my $val = $vals [-$i];
+	# This calculation causes the @bases array to be accessed in reverse, giving the
+	# correct base allocation whether this data contains a series for N bases or not.
+	$i = 0 - $i;
+	
+	my $base = $bases[$i];
+	my $val = $vals[$i];
 	my $base_series_name = $series_name."_".lc $base;
-	push @{$relevant_data->{$base_series_name}{$cycle}}, $val;
+	push @{$data_aggregation_ref->{$base_series_name}{$cycle}}, $val;
   }
 }
 
@@ -934,13 +928,14 @@ sub parse_single_value {
   my $series_name = shift;
   my $cycle = shift;
   my $line = shift;
-  my $relevant_data = shift;
-  
-  #print "SUB parse_single_value\n";
+  my $data_aggregation_ref = shift;
   
   my $val = $line->{$series_name};
+  
   # Only a single value stored here
-  push @{$relevant_data->{$series_name}{$cycle}}, $val;
+  if ($val >= 0) {
+	push @{$data_aggregation_ref->{$series_name}{$cycle}}, $val;
+  }
 }
 
 sub summary_stats {
@@ -954,25 +949,20 @@ sub summary_stats {
   # otherwise data, though. See http://docstore.mik.ua/orelly/perl/prog3/ch09_04.htm
   my $series = shift;
   
-  #print "SUB summary_stats\n";
-  
   my ($mean, $stdev) = ();
   if (ref($series) eq 'HASH') {
 	# If $series is a hash reference, then we have per-cycle data
 	# Collect summary stats for each cycle, put into an array
-	my (@means, @stdevs) = ();
 	foreach my $cycle (sort {$a <=> $b} keys $series) {
-	  $means[$cycle] = mean ($series->{$cycle});
-	  $stdevs[$cycle] = stdev ($series->{$cycle});
+	  $mean->[$cycle] = mean($series->{$cycle});
+	  $stdev->[$cycle] = stdev($series->{$cycle});
 	}
-	$mean = \@means;
-	$stdev = \@stdevs;
   }
   elsif (ref($series) eq 'ARRAY') {
 	# If $series is not a hash reference, it's just a list of numbers with no
 	# further dimensionality
-	$mean = mean ($series);
-	$stdev = stdev ($series);
+	$mean = mean($series);
+	$stdev = stdev($series);
   }
   else {
 	die "DEBUG: $series is not an array or hash reference!\n";
@@ -980,7 +970,7 @@ sub summary_stats {
   return ($mean, $stdev);
 }
 
-sub insert_into_database {
+sub add_data_series_to_object {
   # Following on from summary_stats, this sub handles the way a summarised series is
   # actually set up to be inserted into the database.
   # Specifically, values with cycles can be inserted.
@@ -993,10 +983,7 @@ sub insert_into_database {
   my $data1 = $_[2];
   my $data2 = $_[3];
   
-  
-  #print "SUB insert_into_database\n";
-  
-  # $spread is an array reference containig refs to max, upper quartile, median, lowe quartile and
+  # $spread is an array reference containing refs to max, upper quartile, median, lower quartile and
   # min data, in that order. Not all series have that, but if they do, it will always be supplied
   # together.
   my @spread_values = ('max','upper_quartile','median','lower_quartile','min');
@@ -1005,25 +992,60 @@ sub insert_into_database {
   # Otherwise, take it as a single series
   if ($data2) {
 	# Set up the mean and stdev data in this analysis
-	set_up_object($data1, $series, "mean", $analysis);
-	set_up_object($data2, $series, "stdev", $analysis);
+	data_into_object($data1, $series, "mean", $analysis);
+	data_into_object($data2, $series, "stdev", $analysis);
   }
   else {
-	set_up_object($data1, $series, "", $analysis);
+	data_into_object($data1, $series, "", $analysis);
   }
   
   if ($_[4]) {
 	my $spread = $_[4];
 	foreach my $i (1..5) {
 	  $i--;
-	  set_up_object($spread->[$i],$series,$spread_values[$i],$analysis);
+	  my $data3 = $spread->[$i];
+	  data_into_object($data3, $series, $spread_values[$i], $analysis);
 	}
   }
 }
 
-sub set_up_object {
-  # The code for inserting mean, stdev etc. datasets as partition vs position
-  # data is similar enough to be abstracted out into here.
+sub data_into_object {
+  # After all that, we are now in a position to use the functions available to
+  # $analysis to accept the data we've extracted.
+  # Input here is one of:
+  # A data point, and the name of the series it belongs to
+  # Or a data series, and the name of that series.
+  
+  # Review of relevant API functions:
+  # --Add an analysis property, e.g. 
+  # $analysis->add_property("tool", "InterOp)
+  # Properties are used for storing text information about the analysis.
+  # Stored in table analysis_property
+  #
+  # --Add a valid type
+  # $analysis->add_valid_type("snr_median", "base_position")
+  # Valid types tell the database what a data series is - it's name, and how it should
+  # be interpreted (its type scope).
+  # Valid type names are stored in table valid_type
+  #
+  # --Add a global value
+  # $analysis->add_general_value("general_min_length", 101, "optional description")
+  # Global values are used to store one-off values that apply to the whole analysis.
+  # Their name is entered in value_type, and the value_type id is reused if already
+  # present.
+  # The (numeric) values themselves are stored in table analysis_value.
+  #
+  # --Add a data point for a single locus
+  # $analysis->add_position_value(30, "snr_median", 10.23489)
+  # This tells the DB to store the value 10.23489 under the "snr_median" valid type,
+  # at position 30. (Can be 30 bases along the read, can be any other continuous series
+  # of integers!). Added to table per_position_value.
+  #
+  # --Add a datapoint for a set of loci
+  # $analysis->add_partition_value([1-101], "denitypf", 10252353)
+  # This is similar to add_position_value, except it stores a data point corresponding to
+  # a range of loci - in this case, a whole read. Added to table per_partition_value.
+  
   # A ref to the data, the series name (qscores, intensity etc), data type (mean,
   # stdev etc), and the analysis object are passed in.
   my $relevant_data = $_[0];
@@ -1036,8 +1058,6 @@ sub set_up_object {
   
   my $series_name = $series;
   if ($data_type) { $series_name = $series_name."_".$data_type; }
-  #print "          $series_name\n";
-  #print "SUB set_up_object\n";
   
   # If there is an array reference in $relevant_data, then treat as per-position data
   # If there is a single value, treat it as per-partition data, with the partition
@@ -1048,22 +1068,23 @@ sub set_up_object {
 	$analysis->add_valid_type ($series_name, "base_position");
 	
 	POSITION: foreach my $i (1..@$relevant_data) {
-	  my $val = $relevant_data->[$i-1];
+	  $i --;
+	  my $val = $relevant_data->[$i];
 	  
 	  # This is to ensure that the correct position number is maintained when the supplied array
 	  # has empty cells at the start (as would be the case for read 2 etc.)
 	  if (!$val) { next POSITION; }
-	  
 	  $analysis->add_position_value ($i, $series_name, $val);
 	}
   }
   elsif ($relevant_data) {
-	# Sort out the range of the partition
-	my $range = $analysis->parse_range("1-".$read_ends{$read}{end} - $read_ends{$read}{start});
-	
 	# Add the partition
+	# Sort out the range of the partition; it should be supplied as a string in the form
+	# '1-100'
+	# (note single-quotes - I think Perl tries to be clever and treats that like a
+	# subtraction if it's double-quoted).
 	$analysis->add_valid_type($series_name, "base_partition");
-	$analysis->add_partition_value($range, $series_name, $relevant_data);
+	$analysis->add_partition_value($read_ends{$read}{start}.'-'.$read_ends{$read}{end}, $series_name, $relevant_data);
   }
   else {
 	# The following conditions can simply be quietly ignored, since they are expected to
@@ -1085,7 +1106,7 @@ sub mean {
     return 0;
   }
   
-  my $total = sum (\@data);
+  my $total = sum(\@data);
   my $mean = $total / @data;
   return $mean;
 }
@@ -1117,59 +1138,134 @@ sub sum {
 }
 
 sub median_range_and_quartiles {
-  # The subs median and percentile require a sorted list.
-  # For the sake of efficiency, call those subs via this one, so the
-  # sort only need be done once.
+  # This is a quite general sub, that can produce those summary stats, or lists of
+  # those summary stats, in several different contexts.
+  # I say "max" and "min", but we can use the 95th and 5th percentile respectively.
   my $in = $_[0];
-  my @in = @$in;
+  my $freq_table_mode = $_[1];
   #my @sorted = sort {$a <=> $b} @in;
   
-  #print @in." things coming in\n@in\n";
-  
-  my $median = percentile(\@in, 50);
-  my $upper_quartile = percentile(\@in, 75);
-  my $lower_quartile = percentile(\@in, 25);
-  
-  my $max = @in;
-  MAX: foreach my $q (1..@in) {
-	$q = (@in - $q) + 1;
-	if ($in[$q-1] == 0) { $max --; }
-	else { last MAX; }
-  }
-  
-  my $min = 1;
-  if ($max > 0) {
-	MIN: foreach my $q (1..@in) {
-	  if ($in[$q-1] == 0) { $min ++; }
-	  else { last MIN; }
+  # Just like with the summary_stats sub, a bit of flexibility is required. I may
+  # want to get the median etc. from a frequency table of Qscores, or I may want
+  # to get non-cumulative summary stats.
+  my ($max, $upper_quartile, $median, $lower_quartile, $min) = ();
+  if (ref($in) eq 'HASH') {
+	# If $series is a hash reference, then we have per-cycle data
+	# Collect summary stats for each cycle, put into an array
+	# Otherwise, use recursion to get the summary stats for each cycle
+	foreach my $cycle (sort {$a <=> $b} keys $in) {
+	  my $spread = median_range_and_quartiles($in->{$cycle});
+	  $max->[$cycle]            = $spread->[0];
+	  $upper_quartile->[$cycle] = $spread->[1];
+	  $median->[$cycle]         = $spread->[2];
+	  $lower_quartile->[$cycle] = $spread->[3];
+	  $min->[$cycle]            = $spread->[4];
 	}
   }
-  else { $min = $max; }
-  
-  #print "SPREAD: $max,$upper_quartile,$median,$lower_quartile,$min\n";
+  elsif (ref($in) eq 'ARRAY') {
+	# If $series is not a hash reference, it's either a freq table, or it's just a
+	# list of numbers with no further dimensionality.
+	# If $cumulative exists, do this in freq table mode.
+	if ($freq_table_mode) {
+	  $median         = percentile_from_freq_table($in, 50);
+	  $upper_quartile = percentile_from_freq_table($in, 75);
+	  $lower_quartile = percentile_from_freq_table($in, 25);
+	  #$max            = max_from_freq_table($in);
+	  #if ($max > 0) { $min = min_from_freq_table($in); }
+	  #else          { $min = $max; }
+	  $max            = percentile_from_freq_table($in, 95);
+	  $min            = percentile_from_freq_table($in, 5);
+	}
+	else {
+	  $median         = percentile($in, 50);
+	  $upper_quartile = percentile($in, 75);
+	  $lower_quartile = percentile($in, 25);
+	  #$max            = max($in);
+	  #if ($max > 0) { $min = min($in); }
+	  #else          { $min = $max; }
+	  $max            = percentile($in, 95);
+	  $min            = percentile($in, 5);
+	}
+  }
+  else {
+	die "DEBUG: $in is not an array or hash reference!\n";
+  }
   
   my @spreadstats = ($max,$upper_quartile,$median,$lower_quartile,$min);
   return \@spreadstats;
 }
 
-sub percentile {
+sub max_from_freq_table {
+  # Note: returns the max frequency greater than 0 from a frequency table
+  my $in = shift;
+  my $max = @$in;
+  MAX: foreach my $q (1..@$in) {
+	$q = (@$in - $q) + 1;
+	if ($in->[$q-1] == 0) { $max --; }
+	else { last MAX; }
+  }
+  return $max;
+}
+
+sub min_from_freq_table {
+  # Note: returns the min frequency greater than 0 from a frequency table
+  my $in = shift;
+  my $min = 1;
+  MIN: foreach my $q (1..@$in) {
+	if ($in->[$q-1] == 0) { $min ++; }
+	else { last MIN; }
+  }
+  return $min;
+}
+
+sub max {
+  my $in = shift;
+  my $max = 0;
+  foreach my $i (@$in) {
+	if ($i > $max) {
+	  $max = $i;
+	}
+  }
+  return $max;
+}
+
+sub min {
+  my $in = shift;
+  my $min = $in->[rand @$in];
+  foreach my $i (@$in) {
+	if ($i < $min) {
+	  $min = $i;
+	}
+  }
+  return $min;
+}
+
+sub percentile_from_freq_table {
+  # As with min and max, a special version of this is needed when working with freq tables.
   # Requires sorted data
   my $in = $_[0];
-  my @in = @$in;
   my $p = $_[1];
   
-  # Nope, this is WAY wrong.
   my $cumfreq = get_cumulative_frequency_table($in);
   my $total = sum($in);
   
   if ($total > 0) {
 	my $perc = 0;
-	while ((($cumfreq->[$perc] / $total) <= ($p / 100)) && ($perc <= @in)) {
+	while ((($cumfreq->[$perc] / $total) <= ($p / 100)) && ($perc <= @$in)) {
 	  $perc ++;
 	}
 	return $perc;
   }
   else { return "0"; }
+}
+
+sub percentile {
+  # This is the non freq table version. Called in the same way though.
+  my $in = $_[0];
+  my $p = $_[1];
+  
+  my @sorted = sort {$a <=> $b} @$in;
+  return $sorted[int(($p / 100) * @sorted)];
 }
 
 sub get_cumulative_frequency_table {

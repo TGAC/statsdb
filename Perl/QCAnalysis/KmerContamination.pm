@@ -29,29 +29,28 @@ sub parse_file(){
 
     while ( $line = $fh->getline() ) {
 	chomp($line);
-                if ($line =~ /^Sample.*RefKmerPercent$/) {
-		    #Header row
-		    @header = split(/\t/, $line);
-                } else {
-		    @results = split(/\t/, $line);
-		    
-		    if (@header==@results) {
-			for (my $i=0;$i<@results;$i++) {
-			    if ($header[$i] =~ /Program/) {
-				$analysis->add_property($results[$i], "0.1");
-				$analysis->add_property("tool", $results[$i]);
-			    } elsif ($header[$i] =~ /Reference/) {
-				$analysis->add_property("reference",$results[$i]);
-			    } elsif ($header[$i] =~ /^Sample$/) {
-				$analysis->add_property("sample",$results[$i]);
-			    } elsif (defined $value_keys{$header[$i]}) {
-				if ($results[$i] =~ /,/) { $results[$i] =~ tr/,//d; }
-				$analysis->add_general_value($value_keys{$header[$i]}, $results[$i]);
-			    }
-			}
+	if ($line =~ /^Sample.*RefKmerPercent$/) {
+	    #Header row
+	    @header = split(/\t/, $line);
+	} else {
+	    @results = split(/\t/, $line);
+	    
+	    if (@header==@results) {
+		for (my $i=0;$i<@results;$i++) {
+		    if ($header[$i] =~ /Program/) {
+			$analysis->add_property($results[$i], "0.1");
+			$analysis->add_property("tool", $results[$i]);
+		    } elsif ($header[$i] =~ /Reference/) {
+			$analysis->add_property("reference",$results[$i]);
+		    } elsif ($header[$i] =~ /^Sample$/) {
+			$analysis->add_property("sample",$results[$i]);
+		    } elsif (defined $value_keys{$header[$i]}) {
+			if ($results[$i] =~ /,/) { $results[$i] =~ tr/,//d; }
+			$analysis->add_general_value($value_keys{$header[$i]}, $results[$i]);
 		    }
-
 		}
+	    }
+	}
     }
 
     while ((my $key, my $value) = each(%values)){
