@@ -619,6 +619,7 @@ BEGIN
         CASE WHEN qscope_in IN ('sample','sample_name','barcode')
 			THEN barcode END AS barcode
         FROM subdivisions_tmp_2
+        ORDER BY instrument, run, lane, pair, sample_name, barcode
         ;
     ELSE
         SELECT DISTINCT
@@ -629,6 +630,7 @@ BEGIN
 		CASE WHEN sample_in IS NOT NULL THEN sample_name END AS sample_name,
 		CASE WHEN barcode_in IS NOT NULL THEN barcode END AS barcode
         FROM subdivisions_tmp_2
+        ORDER BY instrument, run, lane, pair, sample_name, barcode
         ;
     END IF;
     DROP TEMPORARY TABLE subdivisions_tmp;
