@@ -139,7 +139,7 @@ sub get_per_position_values() {
   $args[3] = $properties{LANE} if exists $properties{LANE};
   $args[4] = $properties{PAIR} if exists $properties{PAIR};
   $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
+  
   my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
@@ -311,11 +311,12 @@ sub get_runs_between_dates() {
   my $self = shift;
   my $date1 = shift;
   my $date2 = shift;
+  my $date_type = shift;
 
   my $con = $self->get_connection();
-  my $statement = "CALL select_runs_between_dates(?, ?)";
+  my $statement = "CALL select_runs_between_dates(?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($date1, $date2);
+  $sth->execute($date1, $date2, $date_type);
 
   return Reports::ReportTable->new($sth);
 }
@@ -356,6 +357,7 @@ sub list_subdivisions() {
   $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
   $args[6] = $properties{DATE1} if exists $properties{DATE1};
   $args[7] = $properties{DATE2} if exists $properties{DATE2};
+  $args[7] = $properties{DATETYPE} if exists $properties{DATETYPE};
   $args[8] = $properties{TOOL} if exists $properties{TOOL};
   $args[9] = $properties{QSCOPE} if exists $properties{QSCOPE};
   
@@ -373,6 +375,7 @@ sub list_subdivisions() {
   $sth->bind_param(8, $args[7]);
   $sth->bind_param(9, $args[8]);
   $sth->bind_param(10, $args[9]);
+  $sth->bind_param(11, $args[10]);
   
   $sth->execute();
   

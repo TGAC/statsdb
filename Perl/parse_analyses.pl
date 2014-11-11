@@ -11,6 +11,7 @@ use QCAnalysis::InterOp;
 use QCAnalysis;
 use QCAnalysis::DB;
 use QCAnalysis::RunTable;
+use Timecode;
 
 #use warning;
 
@@ -28,19 +29,29 @@ my $status;
 my $config = $arguments{db_config};
 
 my $db = QCAnalysis::DB->new();
+
+# Most likely a bit of 'fossil' code. Commented out to prevent confusion.
 #QCAnalysis::RunTable->add_header_scope("barcode", "analysis");
 
 my @analysis = QCAnalysis::RunTable->parse_file($input); 
 
 $db->connect($config);
 
-foreach(@analysis) {
+ANALYSIS: foreach(@analysis) {
     my $analysis = $_;
     my $analysis_path = $_->get_property("path_to_analysis");
     my $analysis_type = $_->get_property("analysis_type");
     print "path : ".$analysis_path."\n";
     print "type : ".$analysis_type."\n";
-
+    
+    # Get the various timestamps associated with this analysis
+    # Also checks if the run is complete!
+    my $date_check = Timecode->get_dates($analysis);
+    unless ($date_check eq 1) {
+	print "Timestamp check error:\n$date_check";
+	#next ANALYSIS;
+    }
+    
     if (-e $analysis_path) {
 	for ($analysis_type) {
 	    if (/^FastQC$/) {
@@ -72,7 +83,8 @@ foreach(@analysis) {
 		print "WARN: Unknown analysis type [$analysis_type]\n";
 	    }
 	}
-    } else {
+    }
+    else {
 	print "WARN: Unable to read file\n";
     }
 

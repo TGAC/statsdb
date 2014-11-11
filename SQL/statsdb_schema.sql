@@ -138,6 +138,23 @@ CREATE  TABLE IF NOT EXISTS `analysis_property` (
 ENGINE = InnoDB;
 
 
+-- -----------------------------------------------------
+-- Table `analysis_date`
+-- -----------------------------------------------------
+CREATE  TABLE IF NOT EXISTS `analysis_date` (
+  `id` BIGINT(20) NOT NULL AUTO_INCREMENT ,
+  `property` VARCHAR(45) NULL ,
+  `date` TIMESTAMP NULL ,
+  `analysis_id` BIGINT(20) NOT NULL ,
+  PRIMARY KEY (`id`) ,
+  INDEX `fk_analysis_date_analysis1` (`id` ASC) ,
+  CONSTRAINT `fk_analysis_date_analysis2`
+    FOREIGN KEY (`analysis_id` )
+    REFERENCES `analysis` (`id` )
+    ON DELETE NO ACTION
+    ON UPDATE NO ACTION)
+ENGINE = InnoDB;
+
 
 
 SET SQL_MODE=@OLD_SQL_MODE;

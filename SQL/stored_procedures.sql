@@ -66,13 +66,18 @@ BEGIN
     SET date1 = hold;
     END IF;
     
+	IF (date_type IS NULL) THEN
+	SET date_type = 'run_end';
+	END IF;
+	
     SELECT DISTINCT analysis_property.value 
 	FROM analysis_property
 	WHERE property = 'run' 
     AND analysis_id IN
-        (SELECT id
-        FROM statsdb.analysis
-        WHERE analysis.analysisDate BETWEEN date1 AND date2)
+        (SELECT DISTINCT analysis_id
+		FROM analysis_date
+		WHERE property = date_type
+		AND date BETWEEN date1 AND date2)
 	;
 END$$
 
@@ -521,6 +526,7 @@ CREATE PROCEDURE list_subdivisions(
 	IN barcode_in VARCHAR(500),
 	IN date1 TIMESTAMP, 
     IN date2 TIMESTAMP,
+    IN date_type VARCHAR(500),
 	IN tool_in VARCHAR(500),
 	IN qscope_in VARCHAR(500))
 BEGIN
@@ -529,6 +535,10 @@ BEGIN
 		SET hold = date2;
 		SET date2 = date1;
 		SET date1 = hold;
+	END IF;
+	
+    IF (date_type IS NULL) THEN
+	SET date_type = 'run_end';
 	END IF;
 	
 	DROP TEMPORARY TABLE IF EXISTS subdivisions_tmp;
@@ -579,10 +589,10 @@ BEGIN
             WHERE property = 'barcode'
             AND value = barcode_in))
 		AND IF(date1 IS NULL OR date2 IS NULL, TRUE, analysis_id IN
-            (SELECT id
-			FROM statsdb.analysis
-			WHERE analysis.analysisDate 
-			BETWEEN date1 AND date2))
+            (SELECT DISTINCT analysis_id
+			FROM analysis_date
+			WHERE property = date_type
+			AND date BETWEEN date1 AND date2))
 		AND IF(tool_in IS NULL, TRUE, analysis_id IN
             (SELECT DISTINCT analysis_id
             FROM analysis_property
