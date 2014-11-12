@@ -5,6 +5,11 @@ use List::Util qw(min max);
 use Reports::DB;
 use Reports;
 use Timecode;
+use Text::Wrap qw(wrap);
+
+# This is used when printing out long strings, e.g., the program's inbuilt
+# help.
+$Text::Wrap::columns = 90;
 
 # This is a consumer designed specifically to retrieve data parsed from
 # FastQC analysis. 
@@ -54,7 +59,7 @@ GetOptions(
 
 # Call help if -h is used, or if incorrect flags are set
 if (($help) || ($incorrect_flags == 1)) {
-  die
+  die wrap ('','',
   "HELP FOR STATSDB CONSUMER
 This script simply retrieves QC data associated with specific analyses corresponding to the inputs described below.
 -----
@@ -80,7 +85,7 @@ Available query scopes:
 -----
 To produce QC overviews for each sample in a given run, for example, specify a run with the -r flag, and set the scope of the query to 'sample'. This produces a set of reports - one for each sample - in a single PDF. If the query scope is unspecified, a single report (consisting of readings averaged across the whole run) is produced instead.
 -----
-Output to the command line consists of the data used to generate the report, and may be redirected to a file by adding ' > file.txt' to the end of the command used to call this script.\n\n";
+Output to the command line consists of the data used to generate the report, and may be redirected to a file by adding ' > file.txt' to the end of the command used to call this script.\n\n");
 }
 
 
@@ -193,7 +198,12 @@ else {
     
     print "QUERY $n:\n";
     foreach my $key (keys %qry) {
-      print "\t$key:\t".$qry{$key}."\n";
+      if ($qry{$key}) {
+        print "\t$key:\t".$qry{$key}."\n";
+      }
+      else {
+        print "\t$key:\tNone specified\n";
+      }
     }
   }
 }
@@ -247,13 +257,30 @@ foreach my $query_set (@query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  ($column_headers,$returned_values) = parse_query_results(\$avg);
-  @$returned_values = split /\n/, $avg;
+  #($column_headers,$returned_values) = parse_query_results(\$avg);
+  ##@$returned_values = split /\n/, $avg;
+  #
+  #print "Querying analysis properties\nPROPERTY,VALUE\n";
+  #foreach my $line (@$returned_values) {
+  #  my $property = $line->[0];
+  #  my $value = $line->[1];
+  #  
+  #  # Prevent this from producing entries for data that is actually missing.
+  #  # (E.g., barcodes, frequently)
+  #  if ($value) {
+  #    push @{$summarydata{$property}}, $value;
+  #    print "$property\t$value\n";
+  #  }
+  #}
+  #print "\n-----\n";
+  
+  my @returned_values = split /\n/, $avg;
+  my $headers = shift @returned_values;
   
   print "Querying analysis properties\nPROPERTY,VALUE\n";
-  foreach my $line (@$returned_values) {
-    my $property = $line->[0];
-    my $value = $line->[1];
+  foreach my $line (@returned_values) {
+    my @sp = split /,/, $line;
+    my $property = $sp [0]; my $value = $sp [1];
     
     # Prevent this from producing entries for data that is actually missing.
     # (E.g., barcodes, frequently)
@@ -391,7 +418,7 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my ($column_headers,$returned_values) = parse_query_results(\$avg);
+    my ($column_headers,$returned_values) = parse_query_results(\$dat);
     
     print "@$column_headers\n";
     
@@ -437,7 +464,7 @@ foreach my $query_set (@query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  ($column_headers,$returned_values) = parse_query_results(\$avg);
+  ($column_headers,$returned_values) = parse_query_results(\$dat);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
   foreach my $ors (@$returned_values) {

@@ -92,7 +92,7 @@ my $db = Reports::DB->new($config);
 my $reports = Reports->new($db);
 
 # get_runs_between_dates does what it says on the tin.
-print "GETTING RUNS...\n";
+print "Runs between\n\t$timestamp1\tand\n\t$timestamp2...\n";
 my $qry = $reports->get_runs_between_dates($timestamp1, $timestamp2);
 my $rir = $qry->to_csv;
 my @runs_in_range = split /\s/, $rir;

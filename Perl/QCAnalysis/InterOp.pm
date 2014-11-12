@@ -5,6 +5,8 @@ no strict "refs";
 use IO::File;
 use Bio::IlluminaSAV;
 use Storable;
+use lib '..';
+use Timecode;
 
 # This module is a bit bigger than the other parsers, since it must also
 # produce summary stats for the InterOp data. The InterOp files are far too
@@ -70,7 +72,7 @@ sub parse_file {
   my $class = shift;
   
   # Inputs here are run directory, file and a generic analysis object (which I'll clone
-  # and fillup as appropriate).
+  # and fill up as appropriate).
   
   # This sub is meant to be the main entrance point to the module.
   # Pass in the name of a file (full path) and a generic analysis object.
@@ -159,7 +161,11 @@ sub parse_file {
 	  my $single_analysis = $generic_analysis->clone();
 	  $single_analysis->add_property("lane", $lane);
 	  $single_analysis->add_property("pair", $pair);
-	  print "--lane $lane, pair $pair\n";
+	  print "--lane $lane, pair $database_pairids{$pair}\n";
+	  
+	  # Start and end times of a particular read can also now be added
+	  $single_analysis->add_date(Timecode::read_start($run_directory));
+	  $single_analysis->add_date(Timecode::read_end($run_directory));
 	  
 	  parse_data($file, $single_analysis);
 	  

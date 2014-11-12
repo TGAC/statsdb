@@ -5,6 +5,11 @@ use List::Util qw(min max);
 use Reports::DB;
 use Reports;
 use Timecode;
+use Text::Wrap qw(wrap);
+
+# This is used when printing out long strings, e.g., the program's inbuilt
+# help.
+$Text::Wrap::columns = 90;
 
 # This is a consumer designed specifically to retrieve data parsed from
 # FastQC analysis. 
@@ -54,7 +59,7 @@ GetOptions(
 
 # Call help if -h is used, or if incorrect flags are set
 if (($help) || ($incorrect_flags == 1)) {
-  die
+  die wrap ('','',
   "HELP FOR STATSDB CONSUMER
 This script produces a set of reports, similar to a FastQC report, from QC data associated with specific analyses corresponding to the inputs described below.
 -----
@@ -80,7 +85,7 @@ Available query scopes:
 -----
 To produce QC overviews for each sample in a given run, for example, specify a run with the -r flag, and set the scope of the query to 'sample'. This produces a set of reports - one for each sample - in a single PDF. If the query scope is unspecified, a single report (consisting of readings averaged across the whole run) is produced instead.
 -----
-Output to the command line consists of the data used to generate the report, and may be redirected to a file by adding ' > file.txt' to the end of the command used to call this script.\n\n";
+Output to the command line consists of the data used to generate the report, and may be redirected to a file by adding ' > file.txt' to the end of the command used to call this script.\n\n");
 }
 
 
@@ -197,7 +202,12 @@ else {
     
     print "QUERY $n:\n";
     foreach my $key (keys %qry) {
-      print "\t$key:\t".$qry{$key}."\n";
+      if ($qry{$key}) {
+        print "\t$key:\t".$qry{$key}."\n";
+      }
+      else {
+        print "\t$key:\tNone specified\n";
+      }
     }
   }
 }
