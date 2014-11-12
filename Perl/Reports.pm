@@ -479,6 +479,26 @@ sub get_analysis_id() {
   return Reports::ReportTable->new($sth);
 }
 
+sub check_analysis_id() {
+  # Checks if the numeric ID of a particular analysis is present in the
+  # database.
+  my $self = shift;
+  my $pref = shift;
+  my %properties = %$pref; 
+  
+  my @args = (undef);
+  $args[0] = $properties{ANALYSIS} if exists $properties{ANALYSIS};
+  
+  my $statement = "CALL analysis_id_check(?)";
+  
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
 sub get_properties_for_analysis_ids() {
   # Retrieves all the properties associated with an analysis ID.
   # If given a list of analysis IDs, it will retrieve the properties for all of them.

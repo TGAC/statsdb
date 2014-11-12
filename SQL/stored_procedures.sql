@@ -711,6 +711,26 @@ BEGIN
     ;
 END$$
 
+DROP PROCEDURE IF EXISTS analysis_id_check$$
+CREATE PROCEDURE analysis_id_check(
+    IN analysis_in INT(45))	
+BEGIN
+    SELECT COUNT(*) 
+	AS total 
+	FROM analysis
+	WHERE id = analysis_in
+    ;
+END$$
+
+DROP PROCEDURE IF EXISTS delete_analysis$$
+CREATE PROCEDURE delete_analysis(
+    IN analysis_in INT(45))	
+BEGIN
+    DELETE FROM statsdb.analysis
+	WHERE id = analysis_in
+	;
+END$$
+
 -- call summary_per_position_for_run("quality_mean",NULL, NULL, "1", NULL, NULL)$$
 
 -- call summary_per_position_for_run("quality_mean",NULL, NULL, "2", NULL, NULL)$$

@@ -60,7 +60,7 @@ CREATE  TABLE IF NOT EXISTS `per_partition_value` (
   CONSTRAINT `fk_per_base_gc_content_analysis1`
     FOREIGN KEY (`analysis_id` )
     REFERENCES `analysis` (`id` )
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_per_partition_value_value_type1`
     FOREIGN KEY (`value_type_id` )
@@ -85,7 +85,7 @@ CREATE  TABLE IF NOT EXISTS `per_position_value` (
   CONSTRAINT `fk_per_position_value_content_analysis1`
     FOREIGN KEY (`analysis_id` )
     REFERENCES `analysis` (`id` )
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_per_position_value_value_type1`
     FOREIGN KEY (`value_type_id` )
@@ -110,7 +110,7 @@ CREATE  TABLE IF NOT EXISTS `analysis_value` (
   CONSTRAINT `fk_analysis_value_analysis2`
     FOREIGN KEY (`analysis_id` )
     REFERENCES `analysis` (`id` )
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE NO ACTION,
   CONSTRAINT `fk_analysis_value_value_type3`
     FOREIGN KEY (`value_type_id` )
@@ -133,7 +133,7 @@ CREATE  TABLE IF NOT EXISTS `analysis_property` (
   CONSTRAINT `fk_analysis_property_analysis2`
     FOREIGN KEY (`analysis_id` )
     REFERENCES `analysis` (`id` )
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
@@ -151,7 +151,7 @@ CREATE  TABLE IF NOT EXISTS `analysis_date` (
   CONSTRAINT `fk_analysis_date_analysis2`
     FOREIGN KEY (`analysis_id` )
     REFERENCES `analysis` (`id` )
-    ON DELETE NO ACTION
+    ON DELETE CASCADE
     ON UPDATE NO ACTION)
 ENGINE = InnoDB;
 
