@@ -355,13 +355,14 @@ sub list_subdivisions() {
   $args[3] = $properties{PAIR} if exists $properties{PAIR};
   $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
   $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-  $args[6] = $properties{DATE1} if exists $properties{DATE1};
-  $args[7] = $properties{DATE2} if exists $properties{DATE2};
-  $args[7] = $properties{DATETYPE} if exists $properties{DATETYPE};
-  $args[8] = $properties{TOOL} if exists $properties{TOOL};
-  $args[9] = $properties{QSCOPE} if exists $properties{QSCOPE};
+  $args[6] = $properties{ANALYSIS} if exists $properties{ANALYSIS};
+  $args[7] = $properties{DATE1} if exists $properties{DATE1};
+  $args[8] = $properties{DATE2} if exists $properties{DATE2};
+  $args[9] = $properties{DATETYPE} if exists $properties{DATETYPE};
+  $args[10] = $properties{TOOL} if exists $properties{TOOL};
+  $args[11] = $properties{QSCOPE} if exists $properties{QSCOPE};
   
-  my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?)";
+  my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   
   my $sth = $con->prepare($statement) || die $con->errstr;
@@ -376,6 +377,7 @@ sub list_subdivisions() {
   $sth->bind_param(9, $args[8]);
   $sth->bind_param(10, $args[9]);
   $sth->bind_param(11, $args[10]);
+  $sth->bind_param(12, $args[11]);
   
   $sth->execute();
   
