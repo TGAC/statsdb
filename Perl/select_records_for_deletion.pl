@@ -25,6 +25,7 @@ my @opts = (
   'analysis',
   'instrument',
   'run',
+  'pseq',
   'lane',
   'pair',
   'sample_name',

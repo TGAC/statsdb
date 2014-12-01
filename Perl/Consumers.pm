@@ -16,6 +16,7 @@ my %short_flags = (
   'analysis'    => 'a',
   'instrument'  => 'i',
   'run'         => 'r',
+  'pseq'        => 'o',
   'lane'        => 'l',
   'pair'        => 'p',
   'sample_name' => 's',
@@ -37,6 +38,7 @@ my %help_strings = (
   'analysis'    => 'Numeric ID of a single analysis record',
   'instrument'  => 'Instrument name',
   'run'         => 'Run ID',
+  'pseq'        => 'PSEQ/SEQOP ID (TGAC internal tracking system)',
   'lane'        => 'Lane',
   'pair'        => 'Read',
   'sample_name' => 'Sample name',
@@ -128,6 +130,12 @@ sub deal_with_inputs {
     $vals{enddate}   = Timecode::parse_input_date($vals{enddate});
   }
   
+  # If a PSEQ or SEQOP ID (internal TGAC operations tracking code) is
+  # supplied, we need to look up the corresponding run ID, since that's
+  # what the database stores.
+  if ($vals{pseq}) {
+    pseq_to_run_id(\%vals);
+  }
   
   # Now actually set the supplied values into a hash
   my $input_values = ();
@@ -193,6 +201,57 @@ sub check_for_incorrect_flags {
     }
   }
   return $incorrect_flags;
+}
+
+sub pseq_to_run_id {
+  # Users at TGAC might want to query on a particular run, which can
+  # be most conveniently accessed by supplying a PSEQ number.
+  my $args = $_[0];
+  
+  # Several steps are necessary here. If this is running on a machine
+  # outside the TGAC environment, it should fail gracefully and
+  # immediately.
+  # Assume QC environment has already been sourced
+  unless ($ENV{TGACTOOLS_CONFIG_DIR}) {
+    die "ERROR: PSEQ/SEQOP input option -o ".$args->{pseq}." unavailable; cannot be used outside of TGAC internal environment\nRemember to source the QC environment, if you haven't yet!\n";
+  }
+  
+  my $jira_paths_file = $ENV{TGACTOOLS_CONFIG_DIR}.'/jira_paths.txt';
+  open(JIRAPATHS, '<', $jira_paths_file) or die "ERROR: Cannot open Jira paths file $jira_paths_file\n";
+  my %paths = ();
+  while (my $line = <JIRAPATHS>) {
+    chomp $line;
+    my @line = split /\t/, $line;
+    $paths{$line[0]} = $line[1];
+  }
+  close JIRAPATHS;
+  
+  # Check that the PSEQ/SEQOP number has been correctly formatted
+  # Try to correct if it isn't
+  my $pseq = $args->{pseq};
+  unless ($pseq =~ /^PSEQ-[0-9]+$|^SEQOP-[0-9]+$/) {
+    print "WARN: Incorrect PSEQ number detected [$pseq]\n";
+    $pseq =~ s/[^0-9]//g;
+    $pseq = 'PSEQ-'.$pseq;
+    print "Corrected to $pseq\n";
+  }
+  
+  # Look for the PSEQ/SEQOP  number in the jira_paths data
+  if ($paths{$pseq}) {
+    # If the run input has already been set, check that it points at
+    # the same run ID. Otherwise, report a likely input error
+    if ($args->{run}) {
+      unless ($args->{run} eq $paths{$pseq}) {
+        die "WARN: Probable input error\nSupplied run ID (".$args->{run}.") does not match supplied PSEQ/SEQOP run ID ($pseq :: ".$paths{$pseq}.")\n";
+      }
+    }
+    else {
+      $args->{run} = $paths{$pseq};
+    }
+  }
+  else {
+    die "ERROR: ".$paths{$pseq}." not found in current list of runs\n";
+  }
 }
 
 sub check_validity {
