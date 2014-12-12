@@ -25,6 +25,7 @@ my %short_flags = (
   'begin'       => 'c',
   'end'         => 'e',
   'datetype'    => 't',
+  'tool'        => 'm',
 );
 
 # Reverse that so long flags can be looked up from short flags
@@ -47,6 +48,7 @@ my %help_strings = (
   'begin'       => 'Begin date/time of a time interval',
   'end'         => 'End date/time of a time interval',
   'datetype'    => 'Time record type to use in time interval selection',
+  'tool'        => 'Type of analysis data to select (e.g., FastQC)',
 );
 
 my @charlengths = ();
@@ -84,28 +86,34 @@ sub deal_with_inputs {
   # lowercase everything in @$opts (for compatibility)
   $_=lc for @$opts;
   
+  # Check that the options set as valid are all recognised here
+  foreach my $opt (@$opts) {
+    unless ($short_flags{$opt}) {
+      print "PROGRAMMING ERROR: Unrecognised option $opt\nValid options should be chosen from this list:\n";
+      foreach my $i (keys \%short_flags) { print "$i\n"; }
+      die "";
+    }
+  }
+  
   my %vals = ();
   $vals{qscope} = 'na';
-  #my ($help, $db_config, $analysis, $instrument, $run, $lane, $pair,
-  #  $sample, $barcode, $begindate, $enddate, $datetype) = ();
   
-  
-  # OPTIONS TO ADD:
-  # Tool
   $args->getoptions(
     'h|help'          => \$vals{help},
     'd|db_config=s'   => \$vals{db_config},
     'a|analysis:i'    => \$vals{analysis},
     'i|instrument:s'  => \$vals{instrument},
     'r|run:s'         => \$vals{run},
+    'o|pseq:s'        => \$vals{pseq},
     'l|lane:s'        => \$vals{lane},
     'p|pair:i'        => \$vals{pair},
-    's|sample_name:s' => \$vals{sample},
+    's|sample_name:s' => \$vals{sample_name},
     'b|barcode:s'     => \$vals{barcode},
     'q|scope:s'       => \$vals{qscope},
     'c|begin:s'       => \$vals{begindate},
     'e|end:s'         => \$vals{enddate},
     't|datetype:s'    => \$vals{datetype},
+    'm|tool:s'        => \$vals{tool},
   );
   
   # Set the supplied list of active options into a hash, for ease of
@@ -117,7 +125,8 @@ sub deal_with_inputs {
   $opts{help}      = 1;
   
   # Do some simple error-checking
-  # Check that the passed query scope, if any,
+  # Check that the passed query scope, if any, is one of the available
+  # values
   unless (($query_scopes{$vals{qscope}}) || ($vals{qscope} eq 'na')) {
     die "Query scope (-q) should be set to one of:\n".
         (join "\n", keys %query_scopes).
@@ -139,6 +148,7 @@ sub deal_with_inputs {
   
   # Now actually set the supplied values into a hash
   my $input_values = ();
+  $input_values->{QSCOPE} = $vals{qscope};
   my @help_string = ();
   foreach my $opt (keys %opts) {
     # Get the input value for this key
