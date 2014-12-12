@@ -4,15 +4,17 @@ use Getopt::Long;
 
 use strict;
 use File::stat;
-use Time::localtime;
 use QCAnalysis::FastQC;
 use QCAnalysis::KmerContamination;
 use QCAnalysis::InterOp;
+use QCAnalysis::MISO;
 use QCAnalysis;
 use QCAnalysis::DB;
 use QCAnalysis::RunTable;
 use Timecode;
 
+use HTTP::Request;
+use LWP::UserAgent;
 #use warning;
 
 my %arguments = ();
@@ -27,6 +29,7 @@ my $line;
 my $module;
 my $status;
 my $config = $arguments{db_config};
+my $miso_config = $arguments{miso_config};
 
 my $db = QCAnalysis::DB->new();
 
@@ -78,6 +81,11 @@ ANALYSIS: foreach(@analysis) {
 		    print "$InterOp_analyses\n\n";
 		}
 		
+	    }
+	    elsif (/^MISO$/) {
+		my $miso = QCAnalysis::MISO->new($miso_config);
+		$miso->add_miso_data($analysis);
+		$db->insert_analysis($analysis);
 	    }
 	    else {
 		print "WARN: Unknown analysis type [$analysis_type]\n";

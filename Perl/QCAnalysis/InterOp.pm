@@ -887,6 +887,9 @@ sub parse_TileMetrics {
 	
 	# Deal with the various series in this file
 	my $thistile_data = $line->{metric_val};
+	# Values in here seem to come out as 0 sometimes
+	if ($thistile_data < 0) { $thistile_data = 0; }
+	
 	my $series = $tmkeys{$line->{metric}};
 	push @{$relevant_data{$series}}, $thistile_data;
   }
@@ -1083,12 +1086,15 @@ sub data_into_object {
 	  $analysis->add_position_value ($i, $series_name, $val);
 	}
   }
-  elsif ($relevant_data) {
+  elsif (($relevant_data) || ($relevant_data == 0)) {
 	# Add the partition
 	# Sort out the range of the partition; it should be supplied as a string in the form
 	# '1-100'
 	# (note single-quotes - I think Perl tries to be clever and treats that like a
 	# subtraction if it's double-quoted).
+	# Partition can also be added if the value of the data is 0. It's a legit value.
+	# That condition should be fine because adding partitions means we're using only
+	# numbers.
 	$analysis->add_valid_type($series_name, "base_partition");
 	$analysis->add_partition_value($read_ends{$read}{start}.'-'.$read_ends{$read}{end}, $series_name, $relevant_data);
   }
@@ -1196,6 +1202,16 @@ sub median_range_and_quartiles {
   else {
 	die "DEBUG: $in is not an array or hash reference!\n";
   }
+  
+#  
+#  # CHECK SOME STUFF
+#  if ((!$max)||(!$upper_quartile)||(!$median)||(!$lower_quartile)||(!$min)) {
+#	print "ITS ALL GONE WRONG
+#	$max,$upper_quartile,$median,$lower_quartile,$min\n"
+#  }
+#  
+#  
+  
   
   my @spreadstats = ($max,$upper_quartile,$median,$lower_quartile,$min);
   return \@spreadstats;

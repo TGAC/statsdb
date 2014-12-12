@@ -33,7 +33,7 @@ my @opts = (
   'begin',
   'end',
   'datetype',
-  'tool'
+#  'tool'
 );
 
 # Check the flags supplied match those just specified

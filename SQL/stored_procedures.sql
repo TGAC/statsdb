@@ -9,14 +9,13 @@ DELIMITER $$
 DROP PROCEDURE IF EXISTS summary_per_position$$
 CREATE PROCEDURE summary_per_position(
 	IN partition_value VARCHAR(45), 
-	IN  analysis_property VARCHAR (45), 
+	IN analysis_property VARCHAR (45), 
 	IN analysis_property_value VARCHAR (500))
 BEGIN
-	
 	SELECT  
-	position as Position, 
-	size as Size, 
-	AVG(per_partition_value.value) as Average
+        position as Position, 
+        size as Size, 
+        AVG(per_partition_value.value) as Average
 	FROM analysis_property, value_type, per_partition_value,type_scope   
 	WHERE type_scope.scope = "base_partition"
 		AND type_scope.id=value_type.type_scope_id  
@@ -29,7 +28,8 @@ BEGIN
 END$$
 
 DROP PROCEDURE IF EXISTS list_summary_per_scope $$
-CREATE PROCEDURE  list_summary_per_scope(IN scope_l VARCHAR(45))
+CREATE PROCEDURE  list_summary_per_scope(
+    IN scope_l VARCHAR(45))
 BEGIN 
 	SELECT description
 	FROM value_type, type_scope
@@ -41,7 +41,9 @@ END$$
 DROP PROCEDURE IF EXISTS list_selectable_properties$$
 CREATE PROCEDURE list_selectable_properties()
 BEGIN 
-SELECT property FROM analysis_property GROUP BY property;
+    SELECT property
+    FROM analysis_property
+    GROUP BY property;
 END$$ 
 
 DROP PROCEDURE IF EXISTS list_selectable_values_from_property$$
@@ -87,16 +89,17 @@ CREATE PROCEDURE general_summary(
 	IN analysis_property VARCHAR (45), 
 	IN analysis_property_value VARCHAR (500))
 BEGIN
-	SELECT AVG(analysis_value.value) as Average FROM 
-			value_type, analysis_value, analysis_property, type_scope
+	SELECT AVG(analysis_value.value) as Average
+    FROM 
+		value_type, analysis_value, analysis_property, type_scope
 	WHERE
-		type_scope.scope = "analysis"
-		AND type_scope.id=value_type.type_scope_id 
-		AND value_type.id = analysis_value.value_type_id
-		AND analysis_value.analysis_id = analysis_property.analysis_id
-		AND description = summary 
-		AND property = analysis_property
-		AND analysis_property.value = analysis_property_value
+    type_scope.scope = "analysis"
+        AND type_scope.id=value_type.type_scope_id 
+        AND value_type.id = analysis_value.value_type_id
+        AND analysis_value.analysis_id = analysis_property.analysis_id
+        AND description = summary 
+        AND property = analysis_property
+        AND analysis_property.value = analysis_property_value
 	GROUP BY value_type.id;
 END$$
 
@@ -105,9 +108,10 @@ CREATE PROCEDURE general_summaries(
 	IN analysis_property VARCHAR (45), 
 	IN analysis_property_value VARCHAR (500))
 BEGIN
-SELECT description, AVG(analysis_value.value) as Average FROM 
-	value_type, analysis_value, analysis_property, type_scope
-WHERE
+    SELECT description, AVG(analysis_value.value) as Average
+    FROM 
+        value_type, analysis_value, analysis_property, type_scope
+    WHERE
 	type_scope.scope = "analysis"
 		AND type_scope.id=value_type.type_scope_id 
 		AND value_type.id = analysis_value.value_type_id
@@ -172,8 +176,19 @@ CREATE PROCEDURE general_summaries_for_run(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
+    IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))
-BEGIN	
+BEGIN
+    CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		NULL)
+	;
+    
 	SELECT description as Description,
 		AVG(value) as Average, 
 		COUNT(*) as Samples,
@@ -185,13 +200,10 @@ BEGIN
 		AND type_scope.id=value_type.type_scope_id 
 		AND value_type.id = analysis_value.value_type_id
 		AND analysis_value.analysis_id = run.analysis_id
-		AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-		AND IF(run_in IS NULL, TRUE, run.run = run_in)
-		AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in ) 
-		AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-		AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+		AND analysis_value.analysis_id IN
+			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY value_type.id, description;
-
+    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 -- 
@@ -202,24 +214,94 @@ CREATE PROCEDURE summary_per_position_for_run(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
-	IN barcode_in VARCHAR(500))
+    IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+    IN tool_in VARCHAR(500))
 BEGIN
-	DECLARE scope VARCHAR(500);
-	DECLARE valtype_id VARCHAR (500);
-	
-	SET scope = (
-		SELECT type_scope.scope 
-		FROM type_scope 
-		WHERE type_scope.id = (
-			SELECT value_type.type_scope_id 
-			FROM value_type 
-			WHERE value_type.description = partition_value))
-	;
-	
+--	DECLARE scope VARCHAR(500);
+--	DECLARE valtype_id VARCHAR (500);
+--	
+--	SET scope = (
+--		SELECT type_scope.scope 
+--		FROM type_scope 
+--		WHERE type_scope.id = (
+--			SELECT value_type.type_scope_id 
+--			FROM value_type 
+--			WHERE value_type.description = partition_value))
+--	;
+--	
+--	SET valtype_id = (
+--		SELECT id 
+--		FROM value_type 
+--		WHERE value_type.description = partition_value)
+--    ;
+--    
+--    IF EXISTS (
+--		SELECT * 
+--		FROM statsdb.per_partition_value 
+--		WHERE value_type_id = valtype_id) 
+--	THEN
+--		SELECT  
+--		position as Position,
+--		size as Size,
+--		AVG(value) as Average,
+--		COUNT(*) as Samples,
+--		sum(value) as Total
+--		FROM value_type, per_partition_value,type_scope, latest_run as run
+--		WHERE type_scope.scope = scope
+--			AND type_scope.id=value_type.type_scope_id  
+--			AND value_type.description = partition_value
+--			AND value_type.id = per_partition_value.value_type_id  
+--			AND per_partition_value.analysis_id=run.analysis_id
+--			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
+--			AND IF(run_in IS NULL, TRUE, run.run = run_in)
+--			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
+--			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
+--			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+--		GROUP BY value_type.id, position, size
+--		;
+--	ELSE
+--		SELECT  
+--		position as Position,  
+--		'1' as Size,
+--		AVG(value) as Average,
+--		COUNT(*) as Samples,
+--		sum(value) as Total
+--		FROM value_type, per_position_value,type_scope, latest_run as run
+--		WHERE type_scope.scope = scope
+--			AND type_scope.id=value_type.type_scope_id  
+--			AND value_type.description = partition_value
+--			AND value_type.id = per_position_value.value_type_id  
+--			AND per_position_value.analysis_id=run.analysis_id
+--			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
+--			AND IF(run_in IS NULL, TRUE, run.run = run_in)
+--			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
+--			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
+--			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
+--		GROUP BY value_type.id, position
+--		ORDER BY Position
+--		;
+--	END IF;
+
+--  This seems to result in a truly massive increase in speed, largely by
+--  eliminating the use of the run/latest_run views, which are complex and
+--  take a long time to put together.
+    DECLARE valtype_id VARCHAR (500);
 	SET valtype_id = (
 		SELECT id 
 		FROM value_type 
-		WHERE value_type.description = partition_value);
+		WHERE value_type.description = partition_value)
+	;
+	
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
 	
 	IF EXISTS (
 		SELECT * 
@@ -232,18 +314,12 @@ BEGIN
 		AVG(value) as Average,
 		COUNT(*) as Samples,
 		sum(value) as Total
-		FROM value_type, per_partition_value,type_scope, latest_run as run
-		WHERE type_scope.scope = scope
-			AND type_scope.id=value_type.type_scope_id  
-			AND value_type.description = partition_value
-			AND value_type.id = per_partition_value.value_type_id  
-			AND per_partition_value.analysis_id=run.analysis_id
-			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-			AND IF(run_in IS NULL, TRUE, run.run = run_in)
-			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
-			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
-		GROUP BY value_type.id, position, size
+		FROM per_partition_value AS pos
+		INNER JOIN value_type AS val ON val.id = pos.value_type_id
+		WHERE analysis_id IN (SELECT * FROM analysis_ids_tmp)
+		AND value_type_id = valtype_id
+		GROUP BY value_type_id, position
+		ORDER BY position
 		;
 	ELSE
 		SELECT  
@@ -252,21 +328,15 @@ BEGIN
 		AVG(value) as Average,
 		COUNT(*) as Samples,
 		sum(value) as Total
-		FROM value_type, per_position_value,type_scope, latest_run as run
-		WHERE type_scope.scope = scope
-			AND type_scope.id=value_type.type_scope_id  
-			AND value_type.description = partition_value
-			AND value_type.id = per_position_value.value_type_id  
-			AND per_position_value.analysis_id=run.analysis_id
-			AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-			AND IF(run_in IS NULL, TRUE, run.run = run_in)
-			AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in )
-			AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-			AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)
-		GROUP BY value_type.id, position
-		ORDER BY Position
+		FROM per_position_value AS pos
+		INNER JOIN value_type AS val ON val.id = pos.value_type_id
+		WHERE analysis_id IN (SELECT * FROM analysis_ids_tmp)
+		AND value_type_id = valtype_id
+		GROUP BY value_type_id, position
+		ORDER BY position
 		;
-	END IF;
+    END IF;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 DROP PROCEDURE IF EXISTS get_analysis_id$$
@@ -275,8 +345,9 @@ CREATE PROCEDURE get_analysis_id(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
-	IN sample_in VARCHAR(500),
-	IN barcode_in VARCHAR(500))
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+    IN tool_in VARCHAR(500))
 BEGIN
 	SELECT DISTINCT analysis_id 
 	FROM analysis_property
@@ -301,16 +372,77 @@ BEGIN
 			FROM analysis_property
 			WHERE property = 'pair'
 			AND value = pair_in))
-		AND IF(sample_in IS NULL, TRUE, analysis_id IN
+		AND IF(sample_name_in IS NULL, TRUE, analysis_id IN
 			(SELECT DISTINCT analysis_id
 			FROM analysis_property
 			WHERE property = 'sample_name'
-			AND value = sample_in))
+			AND value = sample_name_in))
 		AND IF(barcode_in IS NULL, TRUE, analysis_id IN
 			(SELECT DISTINCT analysis_id
 			FROM analysis_property
 			WHERE property = 'barcode'
 			AND value = barcode_in))
+		AND IF(tool_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'tool'
+			AND value = tool_in))
+	;
+END$$
+
+DROP PROCEDURE IF EXISTS get_analysis_id_as_temp_table$$
+CREATE PROCEDURE get_analysis_id_as_temp_table(
+	IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+    IN tool_in VARCHAR(500))
+BEGIN
+--    This creates a temporary table in memory holding a set of analysis_ids,
+--    in order to work around MySQL's inability to use the output of
+--    stored procedures inside other stored procedures.
+    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+    CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+	SELECT DISTINCT analysis_id 
+	FROM analysis_property
+	WHERE 
+		IF(instrument_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'instrument'
+			AND value = instrument_in))
+		AND IF(run_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'run'
+			AND value = run_in))
+		AND IF(lane_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'lane'
+			AND value = lane_in))
+		AND IF(pair_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'pair'
+			AND value = pair_in))
+		AND IF(sample_name_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'sample_name'
+			AND value = sample_name_in))
+		AND IF(barcode_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'barcode'
+			AND value = barcode_in))
+		AND IF(tool_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'tool'
+			AND value = tool_in))
 	;
 END$$
 
@@ -320,44 +452,27 @@ CREATE PROCEDURE list_runs(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
-	IN sample_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))
 BEGIN
-	SELECT DISTINCT analysis_property.value 
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
+	
+    SELECT DISTINCT analysis_property.value AS run
 	FROM analysis_property
 	WHERE 
-	property = 'run'
-	AND IF(instrument_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'instrument'
-		AND value = instrument_in))
-	AND IF(run_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'run'
-		AND value = run_in))
-	AND IF(lane_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'lane'
-		AND value = lane_in))
-	AND IF(pair_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'pair'
-		AND value = pair_in))
-	AND IF(sample_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'sample_name'
-		AND value = sample_in))
-	AND IF(barcode_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'barcode'
-		AND value = barcode_in))
+    property = 'run'
+    AND analysis_id IN
+		(SELECT * FROM analysis_ids_tmp)
 	;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 DROP PROCEDURE IF EXISTS list_instruments$$
@@ -366,50 +481,34 @@ CREATE PROCEDURE list_instruments(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
-	IN sample_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))
 BEGIN
-	SELECT DISTINCT analysis_property.value 
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		NULL)
+	;
+	
+    SELECT DISTINCT analysis_property.value as instrument
 	FROM analysis_property
 	WHERE 
-	property = 'instrument'
-	AND IF(instrument_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'instrument'
-		AND value = instrument_in))
-	AND IF(run_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'run'
-		AND value = run_in))
-	AND IF(lane_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'lane'
-		AND value = lane_in))
-	AND IF(pair_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'pair'
-		AND value = pair_in))
-	AND IF(sample_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'sample_name'
-		AND value = sample_in))
-	AND IF(barcode_in IS NULL, TRUE, analysis_id IN
-		(SELECT DISTINCT analysis_id
-		FROM analysis_property
-		WHERE property = 'barcode'
-		AND value = barcode_in))
+    property = 'instrument'
+    AND analysis_id IN
+		(SELECT * FROM analysis_ids_tmp)
 	;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 DROP PROCEDURE IF EXISTS list_runs_for_instrument$$
-CREATE PROCEDURE list_runs_for_instrument(IN instrument_in VARCHAR(500))
+CREATE PROCEDURE list_runs_for_instrument(
+    IN instrument_in VARCHAR(500))
 BEGIN
-	SELECT DISTINCT analysis_property.value
+	SELECT DISTINCT analysis_property.value AS run
 	FROM analysis_property 
 	WHERE property = 'run'
 	AND analysis_id IN 
@@ -421,9 +520,10 @@ BEGIN
 END$$
 
 DROP PROCEDURE IF EXISTS list_lanes_for_run$$
-CREATE PROCEDURE list_lanes_for_run(IN run_in VARCHAR(500))
+CREATE PROCEDURE list_lanes_for_run(
+    IN run_in VARCHAR(500))
 BEGIN
-	SELECT DISTINCT analysis_property.value
+	SELECT DISTINCT analysis_property.value AS lane
 	FROM analysis_property 
 	WHERE property = 'lane' 
 	AND analysis_id IN 
@@ -441,12 +541,12 @@ BEGIN
 	SELECT DISTINCT analysis_property.value
 	FROM analysis_property
 	WHERE property = 'Encoding' 
-		AND value IS NOT NULL
-		AND analysis_id IN
-			(SELECT DISTINCT analysis_property.analysis_id
-			FROM analysis_property
-			WHERE property = 'run' 
-			AND value = run_in)
+    AND value IS NOT NULL
+    AND analysis_id IN
+        (SELECT DISTINCT analysis_property.analysis_id
+        FROM analysis_property
+        WHERE property = 'run' 
+        AND value = run_in)
 	;
 END$$
 
@@ -473,7 +573,7 @@ END$$
 
 DROP PROCEDURE IF EXISTS list_barcodes_for_sample$$
 CREATE PROCEDURE list_barcodes_for_sample(
-IN sample_in VARCHAR(500))
+    IN sample_name_in VARCHAR(500))
 BEGIN
 	SELECT DISTINCT analysis_property.value
 	FROM analysis_property
@@ -483,19 +583,18 @@ BEGIN
 			(SELECT DISTINCT analysis_property.analysis_id
 			FROM analysis_property
 			WHERE property = 'sample_name' 
-			AND value = sample_in)
+			AND value = sample_name_in)
 	;
 END$$
 
 DROP PROCEDURE IF EXISTS get_sample_from_run_lane_barcode$$
 CREATE PROCEDURE get_sample_from_run_lane_barcode(
-
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500), 
 	IN barcode_in VARCHAR(500)
 	)
 BEGIN
-	SELECT DISTINCT analysis_property.value
+	SELECT DISTINCT analysis_property.value AS sample_name
 	FROM analysis_property 
 	WHERE property = 'sample_name'
 	AND analysis_id IN
@@ -522,7 +621,7 @@ CREATE PROCEDURE list_subdivisions(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
-	IN sample_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500),
     IN analysis_in BIGINT(20),
 	IN date1 TIMESTAMP, 
@@ -546,69 +645,44 @@ BEGIN
         SET date_type = 'run_end';
 	END IF;
 	
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
+	
 	DROP TEMPORARY TABLE IF EXISTS subdivisions_tmp;
-	CREATE TEMPORARY TABLE subdivisions_tmp ENGINE=MEMORY AS
-	SELECT analysis_id,
-		CASE WHEN property = 'instrument'
-			THEN value END AS instrument,
-		CASE WHEN property = 'run'
-			THEN value END AS run,
-		CASE WHEN property = 'lane'
-			THEN value END AS lane,
-		CASE WHEN property = 'pair'
-			THEN value END AS pair,
-		CASE WHEN property IN ('sample', 'sample_name')
-			THEN value END AS sample_name,
-		CASE WHEN property = 'barcode'
-			THEN value END AS barcode
-	FROM analysis_property
-	WHERE
-		IF(analysis_in IS NULL, TRUE, analysis_id = analysis_in)
-		AND IF (analysis_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT id
-			FROM analysis
-			WHERE id = 'analysis_in'))
-		AND IF(instrument_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'instrument'
-			AND value = instrument_in))
-		AND IF(run_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'run'
-			AND value = run_in))
-		AND IF(lane_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'lane'
-			AND value = lane_in))
-		AND IF(pair_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'pair'
-			AND value = pair_in))
-		AND IF(sample_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'sample_name'
-			AND value = sample_in))
-		AND IF(barcode_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'barcode'
-			AND value = barcode_in))
+    CREATE TEMPORARY TABLE subdivisions_tmp ENGINE=MEMORY AS
+    SELECT analysis_id,
+        CASE WHEN property = 'instrument'
+            THEN value END AS instrument,
+        CASE WHEN property = 'run'
+            THEN value END AS run,
+        CASE WHEN property = 'lane'
+            THEN value END AS lane,
+        CASE WHEN property = 'pair'
+            THEN value END AS pair,
+        CASE WHEN property = 'sample_name'
+            THEN value END AS sample_name,
+        CASE WHEN property = 'barcode'
+            THEN value END AS barcode,
+		CASE WHEN property = 'tool'
+            THEN value END AS tool
+    FROM analysis_property
+    WHERE
+        IF(analysis_in IS NULL, TRUE, analysis_id = analysis_in)
+		AND analysis_id IN
+            (SELECT * FROM analysis_ids_tmp)
 		AND IF(date1 IS NULL OR date2 IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
+            (SELECT DISTINCT analysis_id
 			FROM analysis_date
 			WHERE property = date_type
 			AND date BETWEEN date1 AND date2))
-		AND IF(tool_in IS NULL, TRUE, analysis_id IN
-			(SELECT DISTINCT analysis_id
-			FROM analysis_property
-			WHERE property = 'tool'
-			AND value = tool_in))
-	;
+    ;
 	
 	DROP TEMPORARY TABLE IF EXISTS subdivisions_tmp_2;
 	CREATE TEMPORARY TABLE subdivisions_tmp_2 ENGINE=INNODB AS
@@ -618,7 +692,8 @@ BEGIN
 	GROUP_CONCAT(lane) AS lane,
 	GROUP_CONCAT(pair) AS pair,
 	GROUP_CONCAT(sample_name) AS sample_name,
-	GROUP_CONCAT(barcode) AS barcode
+	GROUP_CONCAT(barcode) AS barcode,
+    GROUP_CONCAT(tool) AS tool
 	FROM subdivisions_tmp
 	GROUP BY analysis_id
 	;
@@ -637,7 +712,8 @@ BEGIN
 		CASE WHEN qscope_in IN ('sample','sample_name','barcode')
 			THEN sample_name END AS sample_name,
 		CASE WHEN qscope_in IN ('sample','sample_name','barcode')
-			THEN barcode END AS barcode
+			THEN barcode END AS barcode,
+        tool as tool
 		FROM subdivisions_tmp_2
 		ORDER BY instrument, run, lane, pair, sample_name, barcode
 		;
@@ -647,12 +723,14 @@ BEGIN
 		CASE WHEN run_in IS NOT NULL THEN run END AS run,
 		CASE WHEN lane_in IS NOT NULL THEN lane END AS lane,
 		CASE WHEN pair_in IS NOT NULL THEN pair END AS pair,
-		CASE WHEN sample_in IS NOT NULL THEN sample_name END AS sample_name,
+		CASE WHEN sample_name_in IS NOT NULL THEN sample_name END AS sample_name,
 		CASE WHEN barcode_in IS NOT NULL THEN barcode END AS barcode
+        tool as tool
 		FROM subdivisions_tmp_2
 		ORDER BY instrument, run, lane, pair, sample_name, barcode
 		;
 	END IF;
+    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 	DROP TEMPORARY TABLE subdivisions_tmp;
 	DROP TEMPORARY TABLE subdivisions_tmp_2;
 END$$
@@ -664,31 +742,39 @@ CREATE PROCEDURE summary_value_with_comment(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
+    IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))	
 BEGIN
+    CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		NULL)
+	;
+    
 	SELECT  
 	description as Description,
 	comment as Comment, 
 	AVG(value) as Average, 
 	COUNT(*) as Samples,
 	sum(value) as Total
-	FROM type_scope, value_type, analysis_value, latest_run as run 
+	FROM type_scope, value_type, analysis_value
 	WHERE
 		scope = scope_in 
 		AND type_scope.id = value_type.type_scope_id 
 		AND analysis_value.value_type_id = value_type.id 
 		AND analysis_value.analysis_id = run.analysis_id
-		AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-		AND IF(run_in IS NULL, TRUE, run.run = run_in)
-		AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in ) 
-		AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-		AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)		
+		AND analysis_value.analysis_id IN
+			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY 
 		description, comment
 	ORDER BY 
 		Total DESC 
 	;
-	
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 DROP PROCEDURE IF EXISTS summary_value$$
@@ -698,28 +784,37 @@ CREATE PROCEDURE summary_value(
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
+    IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500))	
 BEGIN
+    CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		NULL)
+	;
+    
 	SELECT  
 	description as Description,
 	AVG(value) as Average, 
 	COUNT(*) as Samples,
 	sum(value) as Total
-	FROM type_scope, value_type, analysis_value, latest_run as run 
+	FROM type_scope, value_type, analysis_value
 	WHERE scope=scope_in 
 		AND type_scope.id =value_type.type_scope_id 
 		AND analysis_value.value_type_id = value_type.id 
 		AND analysis_value.analysis_id=run.analysis_id
-		AND IF(instrument_in IS NULL, TRUE, run.instrument = instrument_in)
-		AND IF(run_in IS NULL, TRUE, run.run = run_in)
-		AND IF(lane_in  IS NULL, TRUE,  run.lane = lane_in ) 
-		AND IF(pair_in IS NULL, TRUE, run.pair = pair_in)
-		AND IF(barcode_in IS NULL, TRUE, run.barcode = barcode_in)	
+		AND analysis_value.analysis_id IN
+			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY 
 		description, comment
 	ORDER BY
 		Total Desc
 	;
+    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
 DROP PROCEDURE IF EXISTS analysis_id_check$$

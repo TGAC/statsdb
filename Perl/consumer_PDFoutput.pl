@@ -6,6 +6,7 @@ use Reports::DB;
 use Reports;
 use Timecode;
 use Text::Wrap qw(wrap);
+use Consumers;
 
 # This is used when printing out long strings, e.g., the program's inbuilt
 # help.
@@ -18,62 +19,38 @@ $Text::Wrap::columns = 90;
 # FastQC.
 
 system ('clear');
-
-# First, retrieve passed parameters
-# Also, supply help if asked
-my $queryscope = 'na';
-my ($help, $config, $instrument, $run, $lane, $pair,
-    $sample, $barcode, $begindate, $enddate) = ();
-
-# Get all flags. Check that the right flags have been used.
-my $incorrect_flags = 0;
-foreach my $cla (@ARGV) {
-  chomp $cla;
-  if ($cla =~ /^-[a-zA-Z]/) {
-    unless ($cla =~ /^-[hdirlpsbq]$/) {
-      $incorrect_flags = 1;
-      print "Input error:\n  Unknown option '$cla'\n";
-    }
-  }
-  elsif ($cla =~ /^--[a-zA-Z]/) {
-    unless ($cla =~ /^--help$|^--db_config$|^--instrument$|^--run$|^--lane$|^--pair$|^--sample$|^--barcode$|^--scope$/) {
-      $incorrect_flags = 1;
-      print "Input error:\n  Unknown option '$cla'\n";
-    }
-  }
-}
-
-GetOptions(
-  'h|help'         => \$help,
-  'd|db_config=s'  => \$config,
-  'i|instrument:s' => \$instrument,
-  'r|run:s'        => \$run,
-  'l|lane:s'       => \$lane,
-  'p|pair:s'       => \$pair,
-  's|sample:s'     => \$sample,
-  'b|barcode:s'    => \$barcode,
-  'q|scope:s'      => \$queryscope,
-  'c|begin:s'      => \$begindate,
-  'e|end:s'        => \$enddate
+my @opts = (
+  'analysis',
+  'instrument',
+  'run',
+  'pseq',
+  'lane',
+  'pair',
+  'sample_name',
+  'barcode',
+  'scope',
+  'begin',
+  'end',
+  'datetype',
+  'tool'
 );
 
+# Check the flags supplied match those just specified
+my $incorrect_flags = Consumers::check_for_incorrect_flags(\@ARGV, \@opts);
+
+# Get command line arguments, and submit them (and the list of active
+# arguments) to be parsed in.
+my $args = Getopt::Long::Parser->new;
+my ($input_values, $help_string) = Consumers::deal_with_inputs($args,\@opts);
+
 # Call help if -h is used, or if incorrect flags are set
-if (($help) || ($incorrect_flags == 1)) {
+if (($input_values->{HELP}) || ($incorrect_flags == 1)) {
   die wrap ('','',
   "HELP FOR STATSDB CONSUMER
 This script produces a set of reports, similar to a FastQC report, from QC data associated with specific analyses corresponding to the inputs described below.
 -----
 Calling StatsDB Perl consumer with command line options:
-  -d or --db_config   Database connection specification file (required)
-  -i or --instrument  Instrument name (optional)
-  -r or --run         Run ID (optional)
-  -l or --lane        Lane (optional)
-  -p or --pair        Read (optional)
-  -b or --barcode     Barcode  (optional)
-  -s or --sample      Sample name  (optional)
-  -q or --scope       Query scope (optional)
-  -c or --begin       Begin date, when selecting data based upon run date (optional)
-  -e or --end         End date, when selecting data based upon run date (optional)
+$help_string
 -----
 Available query scopes:
       instrument
@@ -90,64 +67,24 @@ Output to the command line consists of the data used to generate the report, and
 
 
 GetOptions();
-print "DB configuration: ". $config."\n";
-my $db = Reports::DB->new($config);
+print "DB configuration: ". $input_values->{DB_CONFIG}."\n";
+my $db = Reports::DB->new($input_values->{DB_CONFIG});
 my $reports = Reports->new($db);
 
-# It used to be that at least one of $instrument and $run must be set.
-# Since a user can now query all runs within a given time frame
-# across more than one machine, though, I can switch this off.
-#unless ($run || $instrument) {
-#  die "A run ID (-r) or an instrument name (-i) parameter must be passed.\n";
-#}
-
-# Populate the query properties hash with supplied values (DBI cleverly deals with non-
-# supplied fields in the appropriate way).
-my %input_values = ();
-if ($instrument) { $input_values{INSTRUMENT} = $instrument; }
-if ($run)        { $input_values{RUN} = $run; }
-if ($lane)       { $input_values{LANE} = $lane; }
-if ($pair)       { $input_values{PAIR} = $pair; }
-if ($barcode)    { $input_values{BARCODE} = $barcode; }
-if ($sample)     { $input_values{SAMPLE_NAME} = $sample; }
-$input_values{TOOL} = 'FastQC';
-
-# Handle date-times, if any are supplied as inputs
-if ($begindate || $enddate) {
-  my $timestamp1 = Timecode::parse_input_date($begindate);
-  my $timestamp2 = Timecode::parse_input_date($enddate);
-  
-  $input_values{DATE1} = $timestamp1;
-  $input_values{DATE2} = $timestamp2;
-}
-
-# Check that query scope (if passed) is set to a sensible value.
-# $queryscope should also be modified slightly to reflect column names
-# in the actual database
-chomp $queryscope;
-$queryscope =~ s/\'//g;
-$queryscope = lc $queryscope;
-unless ($queryscope =~ /^instrument$|^run$|^lane$|^sample$|^sample_name$|^barcode$|^read$|^pair$|^na$/) {
-  die "Query scope should be set to one of:\ninstrument\nrun\nlane\nsample_name\nbarcode\nread\nor left unset\n";
-}
-if ($queryscope =~ /sample/) { $queryscope = 'sample_name'; }
-if ($queryscope =~ /read/)   { $queryscope = 'pair'; }
-$input_values{QSCOPE} = $queryscope; 
+my $confuncs = Consumers->new($reports);
 
 # Check that the input parameters passed do, in fact, exist.
 # If they don't, bail. 
-my $check = check_validity (\%input_values);
+my $check = $confuncs->check_validity($input_values);
 print "$check\n\n";
 
 # Per-sample querying relies upon the sample's barcode being present.
 # If it's not supplied, find it.
 # Bear in mind that if a sample is not from a multiplexed run, there
 # won't be a barcode listed. 
-if (($sample) && (!$barcode)) {
-  $barcode = get_barcode_for_sample ($sample);
-  $input_values{BARCODE} = $barcode;
+if (($input_values->{SAMPLE}) && (!$input_values->{BARCODE})) {
+  $input_values->{BARCODE} = get_barcode_for_sample ($input_values->{SAMPLE});
 }
-
 
 # Plan the set of queries for the consumer to go through (if more than one).
 # If no query scope is set, then a single query is carried out, based on the
@@ -159,13 +96,13 @@ if (($sample) && (!$barcode)) {
 
 # Store queries as hash references.
 my @query_sets = ();
-if ($queryscope eq 'na') {
-  my %qry = %input_values;
+if ($input_values->{QSCOPE} eq 'na') {
+  my %qry = $input_values;
   push @query_sets, \%qry;
 }
 else {
   print "Preparing query sets\n";
-  my $qry = $reports->list_subdivisions(\%input_values);
+  my $qry = $reports->list_subdivisions($input_values);
   my $avg = $qry->to_csv;
   my @returned_values = split /\s/, $avg;
   my $colheads = shift @returned_values;

@@ -110,9 +110,10 @@ sub get_average_values() {
   $args[1] = $properties{RUN} if exists $properties{RUN};
   $args[2] = $properties{LANE} if exists $properties{LANE};
   $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
+  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
   
-  my $statement = "CALL general_summaries_for_run(?,?,?,?,?)";
+  my $statement = "CALL general_summaries_for_run(?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
@@ -120,6 +121,7 @@ sub get_average_values() {
   $sth->bind_param(3, $args[2]);
   $sth->bind_param(4, $args[3]);
   $sth->bind_param(5, $args[4]);
+  $sth->bind_param(6, $args[5]);
   
   $sth->execute();
   
@@ -138,9 +140,11 @@ sub get_per_position_values() {
   $args[2] = $properties{RUN} if exists $properties{RUN};
   $args[3] = $properties{LANE} if exists $properties{LANE};
   $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
+  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[7] = $properties{TOOL} if exists $properties{TOOL};
   
-  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?)";
+  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
@@ -149,7 +153,9 @@ sub get_per_position_values() {
   $sth->bind_param(4, $args[3]);
   $sth->bind_param(5, $args[4]);
   $sth->bind_param(6, $args[5]);
-
+  $sth->bind_param(7, $args[6]);
+  $sth->bind_param(8, $args[7]);
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
@@ -169,9 +175,10 @@ sub get_summary_values_with_comments() {
   $args[2] = $properties{RUN} if exists $properties{RUN};
   $args[3] = $properties{LANE} if exists $properties{LANE};
   $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
-  my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?)";
+  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
+  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
+  
+  my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   
   my $sth = $con->prepare($statement) || die $con->errstr;
@@ -181,7 +188,8 @@ sub get_summary_values_with_comments() {
   $sth->bind_param(4, $args[3]);
   $sth->bind_param(5, $args[4]);
   $sth->bind_param(6, $args[5]);
-
+  $sth->bind_param(7, $args[6]);
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
@@ -201,9 +209,10 @@ sub get_summary_values() {
   $args[2] = $properties{RUN} if exists $properties{RUN};
   $args[3] = $properties{LANE} if exists $properties{LANE};
   $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
-  my $statement = "CALL summary_value(?,?,?,?,?,?)";
+  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
+  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
+  
+  my $statement = "CALL summary_value(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
@@ -212,7 +221,8 @@ sub get_summary_values() {
   $sth->bind_param(4, $args[3]);
   $sth->bind_param(5, $args[4]);
   $sth->bind_param(6, $args[5]);
-
+  $sth->bind_param(7, $args[6]);
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
@@ -348,7 +358,9 @@ sub list_subdivisions() {
   my $pref = shift;
   my %properties = %$pref; 
   
-  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef,
+              undef, undef, undef, undef,
+              undef, undef, undef, undef);
   $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
   $args[1] = $properties{RUN} if exists $properties{RUN};
   $args[2] = $properties{LANE} if exists $properties{LANE};
@@ -463,10 +475,11 @@ sub get_analysis_id() {
   $args[1] = $properties{RUN} if exists $properties{RUN};
   $args[2] = $properties{LANE} if exists $properties{LANE};
   $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE} if exists $properties{SAMPLE};
+  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
   $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[6] = $properties{TOOL} if exists $properties{TOOL};
   
-  my $statement = "CALL get_analysis_id(?,?,?,?,?,?)";
+  my $statement = "CALL get_analysis_id(?,?,?,?,?,?,?)";
   
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
@@ -476,6 +489,7 @@ sub get_analysis_id() {
   $sth->bind_param(4, $args[3]);
   $sth->bind_param(5, $args[4]);
   $sth->bind_param(6, $args[5]);
+  $sth->bind_param(7, $args[6]);
   $sth->execute();
   
   return Reports::ReportTable->new($sth);

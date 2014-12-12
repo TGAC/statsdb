@@ -25,8 +25,14 @@ sub to_csv() {
   my @foo = @{$self->{table}};
   
   my $out = $headers."\n";
-  foreach my $r (@foo) { 
-    my $rowstr = join(",", @$r);
+  foreach my $r (@foo) {
+    my $rowstr = ();
+    # Switch off uninitialised variable warnings here; we know that the
+    # database will occasionally return some, but that's OK in context.
+    {
+      no warnings 'uninitialized';
+      $rowstr = join(",", @$r);
+    }
     $out .= $rowstr."\n";
   }
   return $out;
