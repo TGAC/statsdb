@@ -103,25 +103,21 @@ sub get_average_values() {
   # instrument, run, lane, pair and barcode
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  my @args = (undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
   
   my $statement = "CALL general_summaries_for_run(?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
+  foreach my $i (1..6) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
   
@@ -132,29 +128,23 @@ sub get_per_position_values() {
   my $self = shift;
   my $analysis = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $analysis;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
-  $args[7] = $properties{TOOL} if exists $properties{TOOL};
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[7] = $pref->{TOOL} if exists $pref->{TOOL};
   
-  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?,?)";
+  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-  $sth->bind_param(7, $args[6]);
-  $sth->bind_param(8, $args[7]);
+  foreach my $i (1..8) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
 
@@ -167,28 +157,23 @@ sub get_summary_values_with_comments() {
   my $self = shift;
   my $scope = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
   
   my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-  $sth->bind_param(7, $args[6]);
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
 
@@ -201,27 +186,22 @@ sub get_summary_values() {
   my $self = shift;
   my $scope = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[6] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
   
   my $statement = "CALL summary_value(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-  $sth->bind_param(7, $args[6]);
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
 
@@ -280,12 +260,9 @@ sub list_all_instruments {
   # Try it.
   my $statement = "CALL list_instruments (?,?,?,?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, undef);
-  $sth->bind_param(2, undef);
-  $sth->bind_param(3, undef);
-  $sth->bind_param(4, undef);
-  $sth->bind_param(5, undef);
-  $sth->bind_param(6, undef);
+  foreach my $i (1..6) {
+    $sth->bind_param($i, undef);
+  }
   $sth->execute();
   
   return Reports::ReportTable->new($sth);
@@ -302,12 +279,9 @@ sub list_all_runs {
   #my $statement = "SELECT run FROM run GROUP BY run";
   my $statement = "CALL list_instruments (?,?,?,?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, undef);
-  $sth->bind_param(2, undef);
-  $sth->bind_param(3, undef);
-  $sth->bind_param(4, undef);
-  $sth->bind_param(5, undef);
-  $sth->bind_param(6, undef);
+  foreach my $i (1..6) {
+    $sth->bind_param($i, undef);
+  }
   $sth->execute();
   
   return Reports::ReportTable->new($sth);
@@ -319,14 +293,46 @@ sub get_runs_between_dates() {
   # if the database is repopulated.
   
   my $self = shift;
-  my $date1 = shift;
-  my $date2 = shift;
-  my $date_type = shift;
-
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
+  $args[1] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  $args[2] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
+  
   my $con = $self->get_connection();
   my $statement = "CALL select_runs_between_dates(?,?,?)";
+  
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($date1, $date2, $date_type);
+  $sth->bind_param(1, $args[0]);
+  $sth->bind_param(2, $args[1]);
+  $sth->bind_param(3, $args[2]);
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_operation_overview() {
+  # Retrieves runs that were inserted into the database between two given timepoints
+  # Note that since the actual time of the analysis is recorded, this data will change
+  # if the database is repopulated.
+  
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
+  $args[1] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL operation_overview(?,?)";
+  
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  $sth->bind_param(2, $args[1]);
+  
+  $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
@@ -336,7 +342,7 @@ sub list_lanes_for_run() {
   # to return the lanes in a run 
   my $self = shift;
   my $run = shift;
-
+  
   my $con = $self->get_connection();
   #my $statement = "SELECT lane FROM run WHERE `run` = ? GROUP BY lane";
   my $statement = "CALL list_lanes_for_run (?)";
@@ -356,40 +362,30 @@ sub list_subdivisions() {
   # queries as a single row.
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
   my @args = (undef, undef, undef, undef,
               undef, undef, undef, undef,
               undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-  $args[6] = $properties{ANALYSIS} if exists $properties{ANALYSIS};
-  $args[7] = $properties{DATE1} if exists $properties{DATE1};
-  $args[8] = $properties{DATE2} if exists $properties{DATE2};
-  $args[9] = $properties{DATETYPE} if exists $properties{DATETYPE};
-  $args[10] = $properties{TOOL} if exists $properties{TOOL};
-  $args[11] = $properties{QSCOPE} if exists $properties{QSCOPE};
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{ANALYSIS} if exists $pref->{ANALYSIS};
+  $args[7] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
+  $args[8] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  $args[9] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
+  $args[10] = $pref->{TOOL} if exists $pref->{TOOL};
+  $args[11] = $pref->{QSCOPE} if exists $pref->{QSCOPE};
   
   my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
   
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-  $sth->bind_param(7, $args[6]);
-  $sth->bind_param(8, $args[7]);
-  $sth->bind_param(9, $args[8]);
-  $sth->bind_param(10, $args[9]);
-  $sth->bind_param(11, $args[10]);
-  $sth->bind_param(12, $args[11]);
+  foreach my $i (1..12) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
   
@@ -468,28 +464,23 @@ sub get_analysis_id() {
   # can be returned instead. 
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
   my @args = (undef, undef, undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-  $args[6] = $properties{TOOL} if exists $properties{TOOL};
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
   
   my $statement = "CALL get_analysis_id(?,?,?,?,?,?,?)";
   
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-  $sth->bind_param(7, $args[6]);
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   $sth->execute();
   
   return Reports::ReportTable->new($sth);
@@ -500,10 +491,9 @@ sub check_analysis_id() {
   # database.
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
   my @args = (undef);
-  $args[0] = $properties{ANALYSIS} if exists $properties{ANALYSIS};
+  $args[0] = $pref->{ANALYSIS} if exists $pref->{ANALYSIS};
   
   my $statement = "CALL analysis_id_check(?)";
   
