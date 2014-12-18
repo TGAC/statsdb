@@ -83,6 +83,27 @@ BEGIN
 	;
 END$$
 
+DROP PROCEDURE IF EXISTS operation_overview$$
+CREATE PROCEDURE operation_overview(
+	IN date1 TIMESTAMP,
+    IN date2 TIMESTAMP)
+BEGIN
+	SELECT DISTINCT
+		pr.analysis_id as analysis,
+		d.property as date_type,
+		d.date as date,
+		pr.value AS instrument,
+		gr.value AS run
+	FROM analysis_date AS d
+	INNER JOIN analysis_property AS pr ON d.analysis_id = pr.analysis_id 
+		AND pr.property = 'instrument'
+	INNER JOIN analysis_property AS gr ON d.analysis_id = gr.analysis_id 
+		AND gr.property = 'run'
+	WHERE 
+		date BETWEEN date1 AND date2
+	;
+END
+
 DROP PROCEDURE IF EXISTS general_summary$$
 CREATE PROCEDURE general_summary(
 	IN summary VARCHAR(45), 
@@ -194,12 +215,11 @@ BEGIN
 		COUNT(*) as Samples,
 		sum(value) as Total 
 	FROM 
-		value_type, analysis_value, latest_run as run, type_scope
+		value_type, analysis_value, type_scope
 	WHERE
 		type_scope.scope = "analysis"
 		AND type_scope.id=value_type.type_scope_id 
 		AND value_type.id = analysis_value.value_type_id
-		AND analysis_value.analysis_id = run.analysis_id
 		AND analysis_value.analysis_id IN
 			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY value_type.id, description;
@@ -766,7 +786,6 @@ BEGIN
 		scope = scope_in 
 		AND type_scope.id = value_type.type_scope_id 
 		AND analysis_value.value_type_id = value_type.id 
-		AND analysis_value.analysis_id = run.analysis_id
 		AND analysis_value.analysis_id IN
 			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY 
@@ -806,7 +825,6 @@ BEGIN
 	WHERE scope=scope_in 
 		AND type_scope.id =value_type.type_scope_id 
 		AND analysis_value.value_type_id = value_type.id 
-		AND analysis_value.analysis_id=run.analysis_id
 		AND analysis_value.analysis_id IN
 			(SELECT * FROM analysis_ids_tmp)
 	GROUP BY 
