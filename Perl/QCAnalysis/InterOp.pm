@@ -164,8 +164,8 @@ sub parse_file {
 	  print "--lane $lane, pair $database_pairids{$pair}\n";
 	  
 	  # Start and end times of a particular read can also now be added
-	  $single_analysis->add_date(Timecode::read_start($run_directory));
-	  $single_analysis->add_date(Timecode::read_end($run_directory));
+	  $single_analysis->add_date("read_start",Timecode::read_start($run_directory));
+	  $single_analysis->add_date("read_end",Timecode::read_end($run_directory));
 	  
 	  parse_data($file, $single_analysis);
 	  
