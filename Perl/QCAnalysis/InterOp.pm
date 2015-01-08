@@ -164,8 +164,11 @@ sub parse_file {
 	  print "--lane $lane, pair $database_pairids{$pair}\n";
 	  
 	  # Start and end times of a particular read can also now be added
-	  $single_analysis->add_date("read_start",Timecode::read_start($run_directory));
-	  $single_analysis->add_date("read_end",Timecode::read_end($run_directory));
+	  $single_analysis->add_date('read_start',Timecode::read_start($run_directory,$pair));
+	  $single_analysis->add_date('read_end',Timecode::read_end($run_directory,$pair));
+	  
+	  print "I THINK READ $pair START IS ".$single_analysis->get_date('read_start')."
+	     AND END IS ".$single_analysis->get_date('read_end')."\n";
 	  
 	  parse_data($file, $single_analysis);
 	  
@@ -185,28 +188,6 @@ sub parse_file {
   }
   
   
-#  
-#  
-#  
-#  # OK, OK - final lunacy check. Then I can pack this off once and for all. 
-#  # Does the object I just created have the data I expect?
-#  # Does it have the right read numbers?
-#  # Is the data in each lane... not identical?
-#  foreach my $out_analysis (@analyses) {
-#	my $pair = $out_analysis->get_property("pair");
-#	my $lane = $out_analysis->get_property("lane");
-#	my $encoding = $out_analysis->get_property("encoding");
-#	
-#	my $partvals = $out_analysis->get_partition_values();
-#	
-#	print "$encoding, lane $lane pair $pair --- $partvals\n";
-#  }
-#  
-#  my $oirgnonermg = <STDIN>;
-#  
-#  
-#  
-#  
   
   
   
