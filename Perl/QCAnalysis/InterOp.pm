@@ -167,9 +167,6 @@ sub parse_file {
 	  $single_analysis->add_date('read_start',Timecode::read_start($run_directory,$pair));
 	  $single_analysis->add_date('read_end',Timecode::read_end($run_directory,$pair));
 	  
-	  print "I THINK READ $pair START IS ".$single_analysis->get_date('read_start')."
-	     AND END IS ".$single_analysis->get_date('read_end')."\n";
-	  
 	  parse_data($file, $single_analysis);
 	  
 	  #my $single_analysis = prepare_analysis_object($run_directory, $file, $lane, $pair, $generic_analysis);
