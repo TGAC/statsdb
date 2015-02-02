@@ -33,7 +33,8 @@ my @opts = (
   'begin',
   'end',
   'datetype',
-#  'tool'
+  'tool',
+  'duplicate_type'
 );
 
 # Check the flags supplied match those just specified
@@ -70,6 +71,11 @@ my $db = Reports::DB->new($input_values->{DB_CONFIG});
 my $reports = Reports->new($db);
 
 my $confuncs = Consumers->new($reports);
+
+# If the duplicate_type input is set, make use of it.
+# It instructs the queries to return only the most recent copies of matching data in the database,
+# only older duplicates, or everything.
+$reports->set_duplicate_selection_type($input_values);
 
 # As validation, and for user confirmation, list all the records
 # in the database that correspond to the input list of parameters.

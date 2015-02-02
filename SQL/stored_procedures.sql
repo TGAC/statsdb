@@ -88,20 +88,55 @@ CREATE PROCEDURE operation_overview(
 	IN date1 TIMESTAMP,
     IN date2 TIMESTAMP)
 BEGIN
+	DROP TEMPORARY TABLE IF EXISTS rundates_tmp;
+	CREATE TEMPORARY TABLE rundates_tmp ENGINE=INNODB AS
 	SELECT DISTINCT
-		pr.analysis_id as analysis,
+		#pr.analysis_id as analysis,
 		d.property as date_type,
 		d.date as date,
 		pr.value AS instrument,
-		gr.value AS run
+		gr.value AS run,
+		lr.value AS lane,
+		pp.value AS pair
 	FROM analysis_date AS d
 	INNER JOIN analysis_property AS pr ON d.analysis_id = pr.analysis_id 
 		AND pr.property = 'instrument'
 	INNER JOIN analysis_property AS gr ON d.analysis_id = gr.analysis_id 
 		AND gr.property = 'run'
+	INNER JOIN analysis_property AS lr ON d.analysis_id = lr.analysis_id 
+		AND lr.property = 'lane'
+	INNER JOIN analysis_property AS pp ON d.analysis_id = pp.analysis_id 
+		AND pp.property = 'pair'
 	WHERE 
 		date BETWEEN date1 AND date2
 	;
+	
+	SELECT date_type, date, instrument, run, lane, pair
+	FROM rundates_tmp
+	ORDER BY instrument, run, lane, pair, date_type DESC
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS rundates_tmp;
+END
+
+DROP PROCEDURE IF EXISTS get_lib_type_for_run$$
+CREATE PROCEDURE get_lib_type_for_run(
+	IN run_in VARCHAR(500))
+BEGIN
+	CALL get_analysis_id_as_temp_table(
+		NULL,
+		run_in,
+		NULL,NULL,NULL,NULL,NULL)
+	;
+	
+	SELECT DISTINCT
+	value as libray_type
+	FROM analysis_property
+	WHERE property = ''
+	AND analysis_id IN (SELECT * FROM analysis_ids_tmp)
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END
 
 DROP PROCEDURE IF EXISTS general_summary$$
@@ -367,8 +402,8 @@ CREATE PROCEDURE get_analysis_id(
 	IN pair_in VARCHAR(500),
 	IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500),
-    IN tool_in VARCHAR(500))
-BEGIN
+	IN tool_in VARCHAR(500))
+get_ids:BEGIN
 	SELECT DISTINCT analysis_id 
 	FROM analysis_property
 	WHERE 
@@ -408,23 +443,148 @@ BEGIN
 			WHERE property = 'tool'
 			AND value = tool_in))
 	;
+	
+	-- If @duplicate_selection indicates to retrieve all matching IDs,
+	-- then we need go no further this time.
+	IF @duplicate_selection = 'all' 
+	THEN
+		SELECT analysis_id
+		FROM an_ids_tmp1;
+		LEAVE get_ids;
+	END IF;
+	
+	-- Pull in other identifying info for the run IDs
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	CREATE TEMPORARY TABLE an_ids_tmp2 ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		d.analysisDate as date,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool,
+		ref.value AS screening_reference,
+		ist.value AS interop_subtype
+	FROM an_ids_tmp1 AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	LEFT JOIN analysis_property AS ref 
+		ON tmp.analysis_id = ref.analysis_id 
+		AND ref.property = 'reference'
+	LEFT JOIN analysis_property AS ist 
+		ON tmp.analysis_id = ist.analysis_id 
+		AND ist.property = 'interop_subtype'
+	;
+	
+	-- Get the groupwise most recent dates and their respective records
+	-- Then find all records in that set to get the correct IDs.
+	
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	CREATE TEMPORARY TABLE an_ids_tmp3 ENGINE=MEMORY AS
+	SELECT 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype,
+		MAX(date) AS maxdate
+	FROM an_ids_tmp2
+	GROUP BY 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype
+	;
+	
+	-- List all the most recent pertinent analysis IDs 
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
+	CREATE TEMPORARY TABLE an_ids_tmp4 ENGINE=MEMORY AS
+	SELECT i.analysis_id
+	FROM an_ids_tmp2 AS i
+	INNER JOIN an_ids_tmp3 AS j
+		ON i.instrument = j.instrument
+		AND i.run = j.run
+		AND i.lane = j.lane
+		AND i.pair = j.pair
+		AND i.sample_name = j.sample_name
+		AND i.barcode = j.barcode
+		AND i.tool = j.tool
+		AND (i.screening_reference = j.screening_reference
+			OR (i.screening_reference IS NULL AND j.screening_reference IS NULL))
+		AND (i.interop_subtype = j.interop_subtype
+			OR (i.interop_subtype IS NULL AND j.interop_subtype IS NULL))
+		AND i.date = j.maxdate
+	;
+	
+	-- Note that if conditions make retrieval of most recent IDs the
+	-- default setting here
+	IF @duplicate_selection = 'old' 
+	THEN
+		SELECT analysis_id
+		FROM an_ids_tmp2
+		WHERE analysis_id NOT IN (
+			SELECT analysis_id
+			FROM an_ids_tmp4)
+		;
+	ELSE 
+		SELECT analysis_id
+		FROM an_ids_tmp4;
+	END IF;
+
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
 END$$
 
 DROP PROCEDURE IF EXISTS get_analysis_id_as_temp_table$$
 CREATE PROCEDURE get_analysis_id_as_temp_table(
-	IN instrument_in VARCHAR(500),
+    IN instrument_in VARCHAR(500),
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
 	IN sample_name_in VARCHAR(500),
 	IN barcode_in VARCHAR(500),
-    IN tool_in VARCHAR(500))
-BEGIN
+	IN tool_in VARCHAR(500))
+get_ids:BEGIN
 --    This creates a temporary table in memory holding a set of analysis_ids,
 --    in order to work around MySQL's inability to use the output of
 --    stored procedures inside other stored procedures.
-    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
-    CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+    CREATE TEMPORARY TABLE an_ids_tmp1 ENGINE=MEMORY AS
 	SELECT DISTINCT analysis_id 
 	FROM analysis_property
 	WHERE 
@@ -464,6 +624,396 @@ BEGIN
 			WHERE property = 'tool'
 			AND value = tool_in))
 	;
+	
+	-- If @duplicate_selection indicates to retrieve all matching IDs,
+	-- then we need go no further this time.
+	IF @duplicate_selection = 'all' 
+	THEN
+		DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+		CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+		SELECT analysis_id
+		FROM an_ids_tmp1;
+		LEAVE get_ids;
+	END IF;
+	
+	# Pull in other identifying info for the run IDs
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	CREATE TEMPORARY TABLE an_ids_tmp2 ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		d.analysisDate as date,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool,
+		ref.value AS screening_reference,
+		ist.value AS interop_subtype
+	FROM an_ids_tmp1 AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	LEFT JOIN analysis_property AS ref 
+		ON tmp.analysis_id = ref.analysis_id 
+		AND ref.property = 'reference'
+	LEFT JOIN analysis_property AS ist 
+		ON tmp.analysis_id = ist.analysis_id 
+		AND ist.property = 'interop_subtype'
+	;
+	
+	-- Get the groupwise most recent dates and their respective records
+	-- Then find all records in that set to get the correct IDs.
+	
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	CREATE TEMPORARY TABLE an_ids_tmp3 ENGINE=MEMORY AS
+	SELECT 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype,
+		MAX(date) AS maxdate
+	FROM an_ids_tmp2
+	GROUP BY 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype
+	;
+	
+	-- List all the most recent pertinent analysis IDs 
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
+	CREATE TEMPORARY TABLE an_ids_tmp4 ENGINE=MEMORY AS
+	SELECT i.analysis_id
+	FROM an_ids_tmp2 AS i
+	INNER JOIN an_ids_tmp3 AS j
+		ON i.instrument = j.instrument
+		AND i.run = j.run
+		AND i.lane = j.lane
+		AND i.pair = j.pair
+		AND i.sample_name = j.sample_name
+		AND i.barcode = j.barcode
+		AND i.tool = j.tool
+		AND (i.screening_reference = j.screening_reference
+			OR (i.screening_reference IS NULL AND j.screening_reference IS NULL))
+		AND (i.interop_subtype = j.interop_subtype
+			OR (i.interop_subtype IS NULL AND j.interop_subtype IS NULL))
+		AND i.date = j.maxdate
+	;
+	
+	-- Note that 'if' conditions make retrieval of most recent IDs the
+	-- default setting here
+	IF @duplicate_selection = 'old' 
+	THEN
+		DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+		CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+		SELECT analysis_id
+		FROM an_ids_tmp2
+		WHERE analysis_id NOT IN (
+			SELECT analysis_id
+			FROM an_ids_tmp4)
+		;
+	ELSE 
+		DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+		CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+		SELECT analysis_id
+		FROM an_ids_tmp4;
+	END IF;
+
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
+END$$
+
+DROP PROCEDURE IF EXISTS set_duplicate_selection_type$$
+CREATE PROCEDURE set_duplicate_selection_type(
+    IN type_in VARCHAR(3))
+BEGIN
+	SET @duplicate_selection = type_in;
+END
+
+DROP PROCEDURE IF EXISTS detect_duplicates$$
+CREATE PROCEDURE detect_duplicates(
+IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+	IN tool_in VARCHAR(500))
+get_ids:BEGIN
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+    CREATE TEMPORARY TABLE an_ids_tmp1 ENGINE=MEMORY AS
+	SELECT DISTINCT analysis_id 
+	FROM analysis_property
+	WHERE 
+		IF(instrument_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'instrument'
+			AND value = instrument_in))
+		AND IF(run_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'run'
+			AND value = run_in))
+		AND IF(lane_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'lane'
+			AND value = lane_in))
+		AND IF(pair_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'pair'
+			AND value = pair_in))
+		AND IF(sample_name_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'sample_name'
+			AND value = sample_name_in))
+		AND IF(barcode_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'barcode'
+			AND value = barcode_in))
+		AND IF(tool_in IS NULL, TRUE, analysis_id IN
+			(SELECT DISTINCT analysis_id
+			FROM analysis_property
+			WHERE property = 'tool'
+			AND value = tool_in))
+	;
+	
+	-- Pull in other identifying info for the run IDs
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	CREATE TEMPORARY TABLE an_ids_tmp2 ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		d.analysisDate as date,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool,
+		ref.value AS screening_reference,
+		ist.value AS interop_subtype
+	FROM an_ids_tmp1 AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	LEFT JOIN analysis_property AS ref 
+		ON tmp.analysis_id = ref.analysis_id 
+		AND ref.property = 'reference'
+	LEFT JOIN analysis_property AS ist 
+		ON tmp.analysis_id = ist.analysis_id 
+		AND ist.property = 'interop_subtype'
+	;
+	
+	-- If @duplicate_selection indicates to retrieve all matching IDs,
+	-- then we need go no further this time.
+	IF @duplicate_selection = 'all' 
+	THEN
+		SELECT
+			analysis_id,
+			date,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		FROM an_ids_tmp2
+		ORDER BY 
+			analysis_id,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		;
+		LEAVE get_ids;
+	END IF;
+	
+	-- Get the groupwise most recent dates and their respective records
+	-- Then find all records that AREN'T in that set; these are the older
+	-- duplicates.
+	
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	CREATE TEMPORARY TABLE an_ids_tmp3 ENGINE=MEMORY AS
+	SELECT 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype,
+		MAX(date) AS maxdate
+	FROM an_ids_tmp2
+	GROUP BY 
+		instrument,
+		run,
+		lane,
+		pair,
+		sample_name,
+		barcode,
+		tool,
+		screening_reference,
+		interop_subtype
+	;
+	
+	-- This table (4) should contain all the analysis IDs for the records
+	-- picked out in 3. 
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
+	CREATE TEMPORARY TABLE an_ids_tmp4 ENGINE=MEMORY AS
+	SELECT i.analysis_id
+	FROM an_ids_tmp2 AS i
+	INNER JOIN an_ids_tmp3 AS j
+		ON i.instrument = j.instrument
+		AND i.run = j.run
+		AND i.lane = j.lane
+		AND i.pair = j.pair
+		AND i.sample_name = j.sample_name
+		AND i.barcode = j.barcode
+		AND i.tool = j.tool
+		AND (i.screening_reference = j.screening_reference
+			OR (i.screening_reference IS NULL AND j.screening_reference IS NULL))
+		AND (i.interop_subtype = j.interop_subtype
+			OR (i.interop_subtype IS NULL AND j.interop_subtype IS NULL))
+		AND i.date = j.maxdate
+	;
+	
+	-- Output everything of relevance
+	-- Note that if conditions make retrieval of most recent IDs the
+	-- default setting here
+	IF @duplicate_selection = 'new' 
+	THEN
+		SELECT 
+			analysis_id,
+			date,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		FROM an_ids_tmp2
+		WHERE analysis_id IN (
+			SELECT analysis_id
+			FROM an_ids_tmp4)
+		ORDER BY 
+			analysis_id,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		;
+	ELSE
+		SELECT 
+			analysis_id,
+			date,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		FROM an_ids_tmp2
+		WHERE analysis_id NOT IN (
+			SELECT analysis_id
+			FROM an_ids_tmp4)
+		ORDER BY 
+			analysis_id,
+			tool,
+			instrument,
+			run,
+			lane,
+			pair,
+			sample_name,
+			barcode,
+			screening_reference,
+			interop_subtype
+		;
+	END IF;
+	
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp3;
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp4;
 END$$
 
 DROP PROCEDURE IF EXISTS list_runs$$

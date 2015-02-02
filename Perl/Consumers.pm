@@ -1,5 +1,6 @@
 package Consumers;
 use List::Util qw(min max);
+use Term::ANSIColor;
 use Timecode;
 use strict;
 
@@ -11,21 +12,23 @@ use strict;
 # flags, corresponding to longer names.
 # If adding a new flag, update this too
 my %short_flags = (
-  'help'        => 'h',
-  'db_config'   => 'd',
-  'analysis'    => 'a',
-  'instrument'  => 'i',
-  'run'         => 'r',
-  'pseq'        => 'o',
-  'lane'        => 'l',
-  'pair'        => 'p',
-  'sample_name' => 's',
-  'barcode'     => 'b',
-  'scope'       => 'q',
-  'begin'       => 'c',
-  'end'         => 'e',
-  'datetype'    => 't',
-  'tool'        => 'm',
+  'help'            => 'h',
+  'db_config'       => 'd',
+  'miso_config'     => 'm',
+  'analysis'        => 'a',
+  'instrument'      => 'i',
+  'run'             => 'r',
+  'pseq'            => 'o',
+  'lane'            => 'l',
+  'pair'            => 'p',
+  'sample_name'     => 's',
+  'barcode'         => 'b',
+  'scope'           => 'q',
+  'begin'           => 'c',
+  'end'             => 'e',
+  'datetype'        => 't',
+  'tool'            => 'f',
+  'duplicate_type'  => 'v',
 );
 
 # Reverse that so long flags can be looked up from short flags
@@ -34,21 +37,23 @@ my %long_flags = reverse %short_flags;
 # The following hash stores help strings for individual options in much
 # the same way.
 my %help_strings = (
-  'help'        => 'Display this message',
-  'db_config'   => 'Database connection specification file (required)',
-  'analysis'    => 'Numeric ID of a single analysis record',
-  'instrument'  => 'Instrument name',
-  'run'         => 'Run ID',
-  'pseq'        => 'PSEQ/SEQOP ID (TGAC internal tracking system)',
-  'lane'        => 'Lane',
-  'pair'        => 'Read',
-  'sample_name' => 'Sample name',
-  'barcode'     => 'Barcode',
-  'scope'       => 'Query scope',
-  'begin'       => 'Begin date/time of a time interval',
-  'end'         => 'End date/time of a time interval',
-  'datetype'    => 'Time record type to use in time interval selection',
-  'tool'        => 'Type of analysis data to select (e.g., FastQC)',
+  'help'            => 'Display this message',
+  'db_config'       => 'Database connection specification file (required)',
+  'miso_config'     => 'MISO API connection specification file (required)',
+  'analysis'        => 'Numeric ID of a single analysis record',
+  'instrument'      => 'Instrument name',
+  'run'             => 'Run ID',
+  'pseq'            => 'PSEQ/SEQOP ID (TGAC internal tracking system)',
+  'lane'            => 'Lane',
+  'pair'            => 'Read',
+  'sample_name'     => 'Sample name',
+  'barcode'         => 'Barcode',
+  'scope'           => 'Query scope',
+  'begin'           => 'Begin date/time of a time interval',
+  'end'             => 'End date/time of a time interval',
+  'datetype'        => 'Time record type to use in time interval selection',
+  'tool'            => 'Type of analysis data to select (e.g., FastQC)',
+  'duplicate_type'  => 'Select only the most recent version of matching data (new), only older duplicates (old), or everything (all)'
 );
 
 my @charlengths = ();
@@ -99,21 +104,23 @@ sub deal_with_inputs {
   $vals{qscope} = 'na';
   
   $args->getoptions(
-    'h|help'          => \$vals{help},
-    'd|db_config=s'   => \$vals{db_config},
-    'a|analysis:i'    => \$vals{analysis},
-    'i|instrument:s'  => \$vals{instrument},
-    'r|run:s'         => \$vals{run},
-    'o|pseq:s'        => \$vals{pseq},
-    'l|lane:s'        => \$vals{lane},
-    'p|pair:i'        => \$vals{pair},
-    's|sample_name:s' => \$vals{sample_name},
-    'b|barcode:s'     => \$vals{barcode},
-    'q|scope:s'       => \$vals{qscope},
-    'c|begin:s'       => \$vals{begindate},
-    'e|end:s'         => \$vals{enddate},
-    't|datetype:s'    => \$vals{datetype},
-    'm|tool:s'        => \$vals{tool},
+    'h|help'            => \$vals{help},
+    'd|db_config=s'     => \$vals{db_config},
+    'm|miso_config=s'   => \$vals{miso_config},
+    'a|analysis:i'      => \$vals{analysis},
+    'i|instrument:s'    => \$vals{instrument},
+    'r|run:s'           => \$vals{run},
+    'o|pseq:s'          => \$vals{pseq},
+    'l|lane:s'          => \$vals{lane},
+    'p|pair:i'          => \$vals{pair},
+    's|sample_name:s'   => \$vals{sample_name},
+    'b|barcode:s'       => \$vals{barcode},
+    'q|scope:s'         => \$vals{qscope},
+    'c|begin:s'         => \$vals{begin},
+    'e|end:s'           => \$vals{end},
+    't|datetype:s'      => \$vals{datetype},
+    'f|tool:s'          => \$vals{tool},
+    'v|duplicate_type'  => \$vals{duplicate_type},
   );
   
   # Set the supplied list of active options into a hash, for ease of
@@ -123,6 +130,39 @@ sub deal_with_inputs {
   # Certain options should always be present; set them now
   $opts{db_config} = 1;
   $opts{help}      = 1;
+  # If the MISO config file is in the opts lists, it should be required.
+  if (/miso_config/ ~~ @$opts) {
+    $opts{miso_config} = 1;
+  }
+  
+  # Deal with errors for missing mandatory inputs here
+  # Check both for empty inputs and for files that don't actually exist.
+  my @help_string = ();
+  if ($opts{db_config}) {
+    if (!$vals{db_config}) {
+      $vals{help} = 1;
+      print colored ['bright_white on_red'], "\n::WARNING::";
+      print colored ['reset'], "\tinput flag --db_config MUST be set!\n\n";
+    }
+    elsif (!-f $vals{db_config}) {
+      $vals{help} = 1;
+      print colored ['bright_white on_red'], "\n::WARNING::";
+      print colored ['reset'], "\tCannot find file\n\t\t  ".$vals{db_config}."\n\t\tspecified via input flag --db_config!\n\n";
+    }
+  }
+  
+  if ($opts{miso_config}) {
+    if (!$vals{miso_config}) {
+      $vals{help} = 1;
+      print colored ['bright_white on_red'], "\n::WARNING::";
+      print colored ['reset'], "\tinput flag --miso_config MUST be set!\n\n";
+    }
+    elsif (!-f $vals{miso_config}) {
+      $vals{help} = 1;
+      print colored ['bright_white on_red'], "\n::WARNING::";
+      print colored ['reset'], "\tCannot find file\n\t\t  ".$vals{miso_config}."\n\t\tspecified via input flag --miso_config!\n\n";
+    }
+  }
   
   # Do some simple error-checking
   # Check that the passed query scope, if any, is one of the available
@@ -134,9 +174,9 @@ sub deal_with_inputs {
   }
   
   # Handle date-times, if any are supplied as inputs
-  if ($vals{begindate} || $vals{enddate}) {
-    $vals{begindate} = Timecode::parse_input_date($vals{begindate});
-    $vals{enddate}   = Timecode::parse_input_date($vals{enddate});
+  if ($vals{begin} || $vals{end}) {
+    $vals{begin} = Timecode::parse_input_date($vals{begin});
+    $vals{end}   = Timecode::parse_input_date($vals{end});
   }
   
   # If a PSEQ or SEQOP ID (internal TGAC operations tracking code) is
@@ -146,10 +186,21 @@ sub deal_with_inputs {
     pseq_to_run_id(\%vals);
   }
   
+  # If set, the duplicate_values input must be one of 3 values.
+  # If set improperly, throw a warning and set to null.
+  if ($vals{duplicate_type}) {
+    unless ($vals{duplicate_type} =~ /^all$|^old$|^new$/){
+      print colored ['bright_white on_red'], "\n::WARNING::";
+      print colored ['reset'], "\tInput flag --duplicate_type must be set to one ofthe following:\n\told new all\n\n";
+      $vals{duplicate_type} = ();
+    }
+  }
+  
+  
   # Now actually set the supplied values into a hash
   my $input_values = ();
   $input_values->{QSCOPE} = $vals{qscope};
-  my @help_string = ();
+  
   foreach my $opt (keys %opts) {
     # Get the input value for this key
     my $val = $vals{$opt};
@@ -273,7 +324,8 @@ sub check_validity {
   
   # Note: if warnings (-w) enabled in calling script, this may cause
   # uninitialised value warnings. This is expected - the list_subdivisions
-  # stored procedure sometimes returns null columns at 
+  # stored procedure sometimes returns null columns when a given data type
+  # has no possible representation for certain fields.
   
   my $self = shift;
   my $in = shift;
@@ -288,6 +340,25 @@ sub check_validity {
   }
   
   return "Input validated";
+}
+
+sub check_for_duplicated_data {
+  # Sometimes, the same run may be entered into the database multiple times.
+  # The code in its current state can deal with this (by using only the most
+  # recent data), but a warning and relevant information should be sent to the
+  # user.
+  
+  my $self = shift;
+  my $in = shift;
+  my $reports = $self->{reports};
+  
+  my $qry = $reports->list_subdivisions($in);
+  my $avg = $qry->to_csv;
+  my @returned_values = split /\n/, $avg;
+  
+  if (@returned_values > 1) {
+    return $avg;
+  }
 }
 
 # Set up query sets
@@ -333,7 +404,7 @@ sub prepare_query_sets {
       # Check that if sample names are represented, barcodes are too
       # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
       if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
-        my $bc = get_barcode_for_sample($qry{SAMPLE_NAME});
+        my $bc = $self->get_barcode_for_sample($qry{SAMPLE_NAME});
         $qry{BARCODE} = $bc;
       }
       
@@ -347,6 +418,23 @@ sub prepare_query_sets {
   }
   
   return \@query_sets;
+}
+
+sub get_barcode_for_sample {
+  my $self = shift;
+  my $samp = shift;
+  my $reports = $self->{reports};
+  
+  my $qry = $reports->get_barcodes_for_sample_name($samp);
+  my $dat = $qry->to_csv;
+  my @returned_values = split /\s/, $dat;
+  
+  my $bc = ();
+  my $column_headers = shift @returned_values;
+  if (@returned_values >= 1) {
+    $bc = shift @returned_values;
+  }
+  return $bc;
 }
 
 sub queryset_label {
@@ -389,9 +477,20 @@ sub queryset_label {
 }
 
 
-
 # The following subs all return data in a particular format, to be used in
 # certain contexts - some more specific than others.
+sub round_to_x_places {
+  my $self = shift;
+  my $i = shift;
+  my $places = shift;
+  
+  my $j = abs $i;
+  my $rounded = substr ($j + ('0.' . '0' x $places . '5'), 0, length(int($j)) + $places + 1);
+  if ($i < 0) {
+    $rounded = "-$rounded";
+  }
+  return $rounded;
+}
 
 sub parse_query_results {
   # Dealing with the csv data returned from a query requires several
@@ -564,16 +663,280 @@ sub remove_duplicates {
 
 # The following subs all call R scripts to produce graphs.
 
+sub call_rscript {
+  # Calls an R script (name of script supplied as input) on supplied
+  # data. File containig data and name of output plot should also be
+  # supplied.
+  my $self = shift;
+  my $func = shift;
+  my $data = shift;
+  my $plot = shift;
+  
+  # It would be better if I could pass the filename ($data) to R, rather
+  # than have it hardcoded into the script. 
+  # Passing the name of the output file would be nice too, though I
+  # seem to remember having some kind of trouble with that. 
+  my @argv = ("R --slave -f R/$func.r");
+  system(@argv) == 0 or die "Unable to launch sequence duplication R script\n";
+  
+  # Move the plot somewhere for safe keeping
+  @argv = ("mv -f $plot R/Plots/$plot");
+  system(@argv) == 0 or die "Unable to move quality plot to /Plots directory\n";
+  
+  # What should I return, if anything?
+  # Nothing necessary here.
+}
 
+# All of these subs get data (from a reference to an object containing
+# all data extracted by querying the database as part of a consumer
+# script), write it out to a file, and call an R script to produce a
+# plot from that data. 
+sub read_quality_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "quality_q$qnum.df";
+  my $plotfile = "quality_plot_q$qnum.pdf";
+  my $rscript = "read_quality_graph";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Interval\t90th Percentile\tUpper Quartile\tMedian\tMean\tLower Quartile\t10th Percentile";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'quality_90th_percentile'}};
+    push @line, shift @{$qualdata->{'quality_upper_quartile'}};
+    push @line, shift @{$qualdata->{'quality_median'}};
+    push @line, shift @{$qualdata->{'quality_mean'}};
+    push @line, shift @{$qualdata->{'quality_lower_quartile'}};
+    push @line, shift @{$qualdata->{'quality_10th_percentile'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub quality_distribution_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "qual_dist_q$qnum.df";
+  my $plotfile = "qual_dist_plot_q$qnum.pdf";
+  my $rscript = "quality_distribution";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Xval\tQualDist";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'quality_score_count'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub sequence_content_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "seq_content_q$qnum.df";
+  my $plotfile = "seq_content_plot_q$qnum.pdf";
+  my $rscript = "sequence_content_across_reads";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Interval\tA\tC\tT\tG";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'base_content_a'}};
+    push @line, shift @{$qualdata->{'base_content_c'}};
+    push @line, shift @{$qualdata->{'base_content_t'}};
+    push @line, shift @{$qualdata->{'base_content_g'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub gc_content_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "gc_content_q$qnum.df";
+  my $plotfile = "gc_content_plot_q$qnum.pdf";
+  my $rscript = "gc_content_across_reads";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Interval\tGC";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'gc_content_percentage'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub gc_distribution_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "gc_dist_q$qnum.df";
+  my $plotfile = "gc_dist_plot_q$qnum.pdf";
+  my $rscript = "gc_distribution";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Xval\tGCDist";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'gc_content_count'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub n_content_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "n_content_q$qnum.df";
+  my $plotfile = "n_content_plot_q$qnum.pdf";
+  my $rscript = "n_content_across_reads";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Interval\tN";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'base_content_n_percentage'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub length_distribution_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "gc_dist_q$qnum.df";
+  my $plotfile = "gc_dist_plot_q$qnum.pdf";
+  my $rscript = "gc_distribution";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Xval\tLengthDist";
+  
+  # In the case of Illumina reads, there will only be one entry here.
+  # Put one either side, in order to replicate the FastQC plot.
+  if (@$interval_names == 1) {
+    my $num = $interval_names->[0];
+    unshift @$interval_names, $num - 1;
+    unshift @{$qualdata->{'sequence_length_count'}}, '0.0';
+    push @$interval_names,    $num + 1;
+    push @{$qualdata->{'sequence_length_count'}}, '0.0';
+  }
+  
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'sequence_length_count'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
+sub sequence_duplication_plot {
+  my $self = shift;
+  my $interval_names = shift; # Position info for each data point
+  my $qualdata = shift;       # Reference to data object
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  # Set output filenames
+  my $datafile = "seq_dupe_q$qnum.df";
+  my $plotfile = "seq_dupe_plot_q$qnum.pdf";
+  my $rscript = "sequence_duplication";
+  
+  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+  print DAT "Xval\tSequenceDuplication";
+  foreach my $interval (@$interval_names) {
+    my @line = ($interval);
+    push @line, shift @{$qualdata->{'duplication_level_relative_count'}};
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # And execute the R script!
+  $self->call_rscript($rscript, $datafile, $qnum);
+  
+  return ($plotfile, $datafile);
+}
 
 # The following subs are involved with generating reports in LaTeX.
+
+
+
+
+
+
+
+
+
+# The following subs prepare queries that are useful in general operations overviews
 
 
 

@@ -46,6 +46,51 @@ sub list_global_analyses() {
   return Reports::ReportTable->new($sth);
 }
 
+sub set_duplicate_selection_type() {
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef);
+  $args[0] = $pref->{DUPLICATE_TYPE} if exists $pref->{DUPLICATE_TYPE};
+  
+  my $statement = "CALL set_duplicate_selection_type(?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub detect_duplicates() {
+  # Runs a stored procedure that detects duplicate records matching input parameters
+  # in the database
+  # (old, new or all; specified by set_duplicate_detection_type)
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL detect_duplicates(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
 sub list_per_base_summary_analyses() {
   # List the types of values in the base_partition scope, in which a result value
   # is supplied for a range of determinant values. Mean and quartiles for quality
@@ -296,8 +341,8 @@ sub get_runs_between_dates() {
   my $pref = shift;
   
   my @args = (undef, undef, undef);
-  $args[0] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
-  $args[1] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  $args[0] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[1] = $pref->{END} if exists $pref->{END};
   $args[2] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
   
   my $con = $self->get_connection();
@@ -322,8 +367,8 @@ sub get_operation_overview() {
   my $pref = shift;
   
   my @args = (undef, undef, undef);
-  $args[0] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
-  $args[1] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  $args[0] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[1] = $pref->{END} if exists $pref->{END};
   
   my $con = $self->get_connection();
   my $statement = "CALL operation_overview(?,?)";
@@ -331,6 +376,24 @@ sub get_operation_overview() {
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
   $sth->bind_param(2, $args[1]);
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_library_type_for_run() {
+  # Get library type - i.e., baired-end, RNAseq etc., for a given run
+  my $self = shift;
+  my $pref = shift;
+
+  my @args = (undef);
+  $args[0] = $pref->{RUN} if exists $pref->{RUN};
+  
+  my $statement = "CALL get_lib_type_for_run(?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
   
   $sth->execute();
 
@@ -373,8 +436,8 @@ sub list_subdivisions() {
   $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
   $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
   $args[6] = $pref->{ANALYSIS} if exists $pref->{ANALYSIS};
-  $args[7] = $pref->{BEGINDATE} if exists $pref->{BEGINDATE};
-  $args[8] = $pref->{ENDDATE} if exists $pref->{ENDDATE};
+  $args[7] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[8] = $pref->{END} if exists $pref->{END};
   $args[9] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
   $args[10] = $pref->{TOOL} if exists $pref->{TOOL};
   $args[11] = $pref->{QSCOPE} if exists $pref->{QSCOPE};
