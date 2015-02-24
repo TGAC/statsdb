@@ -253,6 +253,55 @@ sub get_summary_values() {
   return Reports::ReportTable->new($sth);
 }
 
+sub list_contaminants () {
+  # Returns a list of contaminants that were screened against for a given set of inputs
+  # (instrument, run and lane)
+  my $self = shift;
+  my $pref = shift;
+
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  
+  my $statement = "CALL list_contaminants(?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..3) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub contaminant_summary () {
+  # Returns a set of screening statistics for a set of instrument, run and lane
+  # analyses and a reference genome screened against. 
+  my $self = shift;
+  my $reference = shift;
+  my $pref = shift;
+
+  my @args = (undef, undef, undef);
+  $args[0] = $reference;
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  
+  my $statement = "CALL contaminant_summary(?,?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..4) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+
 sub get_analysis_properties() {
   # Get a list of all the different properties that are available for all
   # analyses.
@@ -415,6 +464,19 @@ sub list_lanes_for_run() {
   return Reports::ReportTable->new($sth);
 }
 
+sub count_reads_for_run() {
+  # This uses a less generalist function than the previous two subs
+  # to return the lanes in a run 
+  my $self = shift;
+  my $run = shift;
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL count_reads_for_run(?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($run);
+  
+  return Reports::ReportTable->new($sth);
+}
 
 sub list_subdivisions() {
   # This is for assembling the query sets used by a consumer.

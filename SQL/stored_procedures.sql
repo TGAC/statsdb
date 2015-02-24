@@ -404,7 +404,9 @@ CREATE PROCEDURE get_analysis_id(
 	IN barcode_in VARCHAR(500),
 	IN tool_in VARCHAR(500))
 get_ids:BEGIN
-	SELECT DISTINCT analysis_id 
+	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
+	CREATE TEMPORARY TABLE an_ids_tmp1 ENGINE=INNODB AS
+    SELECT DISTINCT analysis_id 
 	FROM analysis_property
 	WHERE 
 		IF(instrument_in IS NULL, TRUE, analysis_id IN
@@ -1182,6 +1184,45 @@ BEGIN
 		FROM analysis_property 
 		WHERE property = 'run'
 		AND value = run_in)
+	;
+END$$
+
+DROP PROCEDURE IF EXISTS count_reads_for_run$$
+CREATE PROCEDURE count_reads_for_run(
+	IN run_in VARCHAR(500))
+BEGIN
+	-- The idea is to get the number of reads for all subdivisions
+	-- of a run here, cutting down the number of queries required.
+	CALL get_analysis_id_as_temp_table(
+		NULL,
+		run_in,
+		NULL,NULL,NULL,NULL,NULL)
+	;
+	
+	SELECT 
+		av.value AS numreads,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode
+	FROM analysis_value AS av
+	INNER JOIN analysis_property AS ln 
+		ON av.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON av.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON av.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON av.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	WHERE av.analysis_id IN (SELECT * FROM analysis_ids_tmp)
+	AND av.value_type_id IN (
+		SELECT id
+		FROM value_type
+		WHERE description = 'general_total_sequences')
 	;
 END$$
 

@@ -638,7 +638,10 @@ sub embiggen {
 
 sub remove_duplicates {
   # Dead simple: return an array with only one of each unique string.
-  my @in = @_;
+  my $self = shift;
+  my $in = shift;
+  
+  my @in = @$in;
   my @out = ();
   
   my %chk = ();
@@ -667,24 +670,51 @@ sub call_rscript {
   # Calls an R script (name of script supplied as input) on supplied
   # data. File containig data and name of output plot should also be
   # supplied.
+  # $args should be an array reference
   my $self = shift;
   my $func = shift;
   my $data = shift;
-  my $plot = shift;
+  my $args = shift;
   
   # It would be better if I could pass the filename ($data) to R, rather
   # than have it hardcoded into the script. 
   # Passing the name of the output file would be nice too, though I
-  # seem to remember having some kind of trouble with that. 
+  # seem to remember having some kind of trouble with that.
+  # Note that R scripts should all return the name of the plot file.
+  # (Should probably implement a check for errors or something)
   my @argv = ("R --slave -f R/$func.r");
-  system(@argv) == 0 or die "Unable to launch sequence duplication R script\n";
+  if (ref $args) {
+    $argv[0] .= " --args";
+    foreach my $arg (@$args) { $argv[0] .= " $arg"; }
+  }
+  elsif ($args) { print "ERROR: option \$args should be an array reference when calling R script $func\n"; }
+  
+  my $Rout = system(@argv) == 0 or die "ERROR: Unable to launch $func R script\n";
+  my @Rout = split /\n/, $Rout;
+  my $plot = ();
+  foreach my $line (@Rout) {
+    if ($line =~ /PLOT FILE: /) {
+      $plot = $line;
+      $plot =~ s/PLOT FILE: //g;
+      chomp $plot;
+    }
+  }
   
   # Move the plot somewhere for safe keeping
-  @argv = ("mv -f $plot R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move quality plot to /Plots directory\n";
+  # To make it clear, this first check is asking if the variable $plot holds anything, bot whether
+  # the file itself is found. 
+  if ($plot) {
+    # NOTE: if using ggplot, I can easily save it to the right place within R, so I tend to
+    # do it there. Only lauch this mv if it's actually necessary
+    if (-e $plot) {
+      @argv = ("mv -f $plot R/Plots/$plot");
+      system(@argv) == 0 or die "ERROR: Unable to move quality plot to /Plots directory\n";
+    }
+  }
+  else { print "ERROR: No plot found for R script $func\n"; }
   
   # What should I return, if anything?
-  # Nothing necessary here.
+  return ($plot);
 }
 
 # All of these subs get data (from a reference to an object containing
@@ -717,8 +747,12 @@ sub read_quality_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -744,8 +778,12 @@ sub quality_distribution_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -774,8 +812,12 @@ sub sequence_content_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -801,8 +843,12 @@ sub gc_content_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -828,8 +874,12 @@ sub gc_distribution_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -855,8 +905,12 @@ sub n_content_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -893,8 +947,12 @@ sub length_distribution_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
@@ -907,7 +965,7 @@ sub sequence_duplication_plot {
   
   # Set output filenames
   my $datafile = "seq_dupe_q$qnum.df";
-  my $plotfile = "seq_dupe_plot_q$qnum.pdf";
+  #my $plotfile = "seq_dupe_plot_q$qnum.pdf";
   my $rscript = "sequence_duplication";
   
   open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
@@ -920,19 +978,252 @@ sub sequence_duplication_plot {
   }
   close DAT;
   
+  # Set up arguments
+  # $qnum will be one arg
+  my @args = ($qnum);
+  
   # And execute the R script!
-  $self->call_rscript($rscript, $datafile, $qnum);
+  my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
+  
+  return ($plotfile, $datafile);
+}
+
+sub machine_activity_plot {
+  # Makes a plot of when machines are actually engaged over a given time interval
+  my $self = shift;
+  my $inputs = shift;   # The standard hash reference to the inputs arranged above
+  my $qualdata = shift; # File containing operations overview data
+  
+  my $datafile = "ops_dates.df";
+  #my $plotfile = "ops_plot.pdf";
+  my $rscript = "instrument_activity_plot";
+  
+  open(DAT, '>', $datafile) or die "Cannot open operations data file $datafile for R input\n";
+  print DAT "DATE_TYPE,DATE,INSTRUMENT,RUN,LANE,PAIR";
+  foreach my $line (@$qualdata) {
+    print DAT "\n$line";
+  }
+  close DAT;
+  
+  # Set up arguments
+  my @args = ("'".$inputs->{BEGIN}."'", "'".$inputs->{END}."'");
+  
+  my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
+  
+  return ($plotfile, $datafile);
+}
+
+sub adapter_performance_barplot {
+  # Makes a simple bar plot. Data should be supplied as a hash reference, with
+  # the hash keys being the names of the plots. Barcode tags can also be supplied
+  # as a second hash reference.
+  my $self = shift;
+  my $data = shift;
+  my $tags = shift;
+  my $title = shift;
+  # Going to assume that the title is "Lane n adapters" or similar
+  my $lane = $title;
+  $lane =~ s/[^0-9]//g;
+  
+  my $datafile = "adapter_plot.df";
+  my $rscript = "adapter_barplot";
+  
+  my @sample_names = sort {$a cmp $b} keys $data;
+  
+  open(DAT, '>', $datafile) or die "Cannot open operations data file $datafile for R input\n";
+  print DAT "sampleName,readCount,barcode";
+  foreach my $sample_name (@sample_names) {
+    print DAT "$sample_name,".$data->{$sample_name}.",".$tags->{$sample_name};
+  }
+  close DAT;
+  die;
+  # Set up arguments
+  my @args = ("'".$title."' $lane");
+  
+  my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
   
   return ($plotfile, $datafile);
 }
 
 # The following subs are involved with generating reports in LaTeX.
+# Given relevant inputs or data, they will produce a string that can be
+# interpolated with others to produce a full LaTeX file from a consumer
+# script.
+my %texcode = ();
+$texcode {"open_fig"} =
+"\\begin{figure}[htp]
+\\large
+{\\bf LABEL}
+\\\\
+{\\bf READS_FILE}\n";
 
+$texcode{"left_img"} =
+"\n\\begin{minipage}{0.45\\textwidth}
+\\centering\n";
 
+$texcode{"include_img"} =
+"\\includegraphics[width=1\\textwidth]{img}\n";
 
+$texcode{"between_img"} =
+"\\end{minipage}
+\\hfill
+\\begin{minipage}{0.45\\textwidth}
+\\centering\n";
 
+$texcode{"right_img"} =
+"\\end{minipage}\n\n";
 
+$texcode {"close_fig"} =
+"\\end{figure}
+\\clearpage\n\n";
 
+sub new_texdoc {
+  # Sets up the modules and opening declarations etc. that are necessary at the
+  # beginning of the document
+  return "\\documentclass[slides,12pt]{article}
+  \\usepackage{graphicx}
+  \\usepackage{longtable}
+  \\usepackage[margin=0.75in]{geometry}
+  \\usepackage{float}
+  \\usepackage{multirow}
+  \\graphicspath{ {R/Plots/} }
+  \\begin{document}\n";
+}
+
+sub clear_page {
+  # Basically a forced declaration to finish a page and move on to the next.
+  return "\\clearpage\n\n";
+}
+
+sub make_vertical_space {
+  # Makes a vspace command, which causes everything below to be nudged downwards by the
+  # specified number of millimetres.
+  my $self = shift;
+  my $n = shift;
+  return "\\vspace{$n mm}\n";
+}
+
+sub end_texdoc {
+  return "\\end{document}";
+}
+
+sub make_simple_table {
+  # Takes in a lot of array refs and uses them to build a table.
+  # Does a sanity check first: number of headers should match number of columns,
+  # and number of rows should be the same across all columns.
+  # Array of headers supplied first, followed by arrays for each of the data
+  # columns
+  my $self = shift;
+  my $headers = shift;
+  my $data = shift;
+  # Use this in cases where you know that the number of column headers is going oto be different to the
+  # number of rows (e.g., multi-line headers). 
+  my $suppress_colcount_check = shift; 
+  
+  # Sanity checks
+  # Check number of headers = number of columns
+  unless ((@$data == @$headers) || ($suppress_colcount_check)) {
+    die "ERROR: Number of column headings in LaTeX data table does not match number of data columns\n(".@$data." vs. ".@$headers.")\n";
+  }
+  
+  # Check number of rows is always the same
+  my $numrows = @{$data->[0]};
+  foreach my $i (1..@$data) {
+    $i--;
+    unless (@{$data->[$i]} == $numrows) {
+      die "ERROR: Data colums in LaTeX table have different lengths.\n";
+    }
+  }
+  
+  # Output comes as a string, with the table data encoded within it.
+  my $string = "\\begin{tabular}{";
+  
+  # Set number of columns in this tabular environment
+  foreach my $col (@$data) { $string .= 'l'; }
+  $string .= '}';
+  $string .= "\n\t". join ' & ', @$headers."\\\\"."\n\t".'\hline'."\n";
+  
+  foreach my $row (1..$numrows) {
+    $row --;
+    my @rowdata = ();
+    foreach my $col (@$data) {
+      push @rowdata, $col->[$row];
+    }
+    $string .= "\t".join ' & ', @rowdata."\\\\"."\n";
+  }
+  
+  $string .= "\\end{tabular}\n";
+  return $string;
+}
+
+sub make_simple_figure {
+  # Plant a single, full-width figure down. 
+  my $img = $_[0];
+  
+  # This might need some work yet.
+  my $fig =
+  "\\begin{figure}[htp]
+  \\includegraphics[width=1\\textwidth]{$img}
+  \\end{figure}
+  \\clearpage
+  ";
+  return $fig;
+}
+
+sub make_fastqc_report_figure {
+  # Makes a figure comprised of up to 8 sub-figures per page.
+  # These appear in a 2X4 grid.
+  my $self = shift;
+  my $plotfiles = shift;
+  
+  if (@$plotfiles > 8) {
+    die "ERROR: incorrect number of plot files (".@$plotfiles." > 8) supplied to LaTeX figure generator\n";
+  }
+  
+  # Using the bits of TeX code set earlier, this creates a 2x4 figure
+  # with the 8 plots just produced by R.
+  my $string = $texcode{"open_fig"};
+  $string =~ s/_/\\_/g;
+  $string =~ s/%/\\%/g;
+  
+  # I reuse this sub somewhere else, in a different context. In that case, then there might be either
+  # 1, 2 or 8 plots supplied. That means I have to add the capability to deal with odd numbers of
+  # figures. They should be over to the left. 
+  
+  my $leftright = 'l';
+  my $c = 0;
+  foreach my $plot (@$plotfiles) {
+    my $subfig = $texcode{"include_img"};
+    $c++;
+    $subfig =~ s/img/$plot/;
+    
+    if ($leftright eq 'l') {
+      if ($c == @$plotfiles) {
+        $string .= $texcode{"left_img"}.$subfig.$texcode{"between_img"}.$texcode{"right_img"};
+      }
+      else {
+        $string .= $texcode{"left_img"}.$subfig.$texcode{"between_img"};
+        $leftright = 'r';
+      }
+    }
+    else {
+      $string .= $subfig.$texcode{"right_img"};
+      $leftright = 'l';
+    }
+    
+  }
+  $string .= $texcode{"close_fig"};
+  return $string;
+}
+
+sub latex_to_pdf {
+  # Calls pdflatex on a LaTeX doc, producing a PDF.
+  my $self = shift;
+  my $latex = shift;
+  
+  my @argv = ('pdflatex '.$latex);
+  system(@argv) == 0 or die "Cannot automatically convert $latex to PDF\n";
+}
 
 
 

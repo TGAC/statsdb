@@ -3,6 +3,10 @@ use IO::File;
 use JSON;
 use strict;
 
+# Some JSON settings
+#my $json = JSON->new();
+#$json = $json->max_depth(1000000000000);
+
 =head3 Reports::DB->new()
         
 Constructor method. This constuctor doesn't actually establishes the connection.
@@ -247,7 +251,10 @@ sub get_run_info {
   my $self = shift;
   my $library = shift;
   
-  my $url = "/miso/rest/run/$library";
+  # May want to retrieve all runs. To do that, $library is left out.
+  my $url = ();
+  if ($library) { $url = "/miso/rest/run/$library"; }
+  else          { $url = "/miso/rest/run"; }
   
   my $data = $self->request($url);
   return from_json($data);

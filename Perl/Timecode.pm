@@ -1,6 +1,8 @@
 package Timecode;
 use XML::Simple;
 use List::Util qw( min max );
+use Time::Local qw(timegm);
+use POSIX;
 use strict;
 local $| = 1;
 
@@ -157,6 +159,69 @@ sub check_input_time_format {
   }
 }
 
+sub convert_to_numeric_datestamp {
+  # Converts a date supplied in the human/SQL-readable format above to the numeric
+  # string-type datestamp used by MISO. (UNIX epoch timestamp)
+  my $instamp = $_[0];
+  
+  my ($date, $time) = split / /, $instamp;
+  my ($year,$month,$day) = split /-/, $date;
+  my ($hour,$min,$sec) = split /:/, $time;
+  
+  return timegm($sec, $min, $hour, $day, $month, $year);
+}
+
+sub convert_from_numeric_datestamp {
+  # Converts UNIX epoch timestamps into the format I use more widely here.
+  my $instamp = $_[0];
+  
+  # Note that some epoch stamps are formatted for milliseconds, but others aren't.
+  # Try getting a date; if the year comes back as a large number, remove the last 3 characters
+  # and try again. 
+  $instamp = format_numeric_datestamp($instamp);
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday) = gmtime($instamp);
+  $year += 1900;
+  #$month ++;
+  
+  my $datestring = sprintf "%04d-%02d-%02d %02d:%02d:%02d", $year,$month,$mday,$hour,$min,$sec;
+  
+  #print "INPUT\t $instamp\tOUT\t$datestring\n\n";
+  
+  return $datestring;
+}
+
+sub format_numeric_datestamp {
+  # Sometimes, the unix epoch timestamps we get are formatted in milliseconds rather than
+  # the seconds that perl expects.
+  # If this proves to be the case, strip the millisecond values off.
+  my $instamp = $_[0];
+  
+  my ($sec,$min,$hour,$mday,$month,$year,$wday,$yday) = gmtime($instamp);
+  $year += 1900;
+  #$month ++;
+  
+  # Consider it future-proof.
+  if ($year > 3000) {
+    for (1..3) { chop $instamp; }
+  }
+  
+  return $instamp;
+}
+
+sub convert_to_human_readable_date {
+  # This takes the standard datetime input format (YYYY-MM-DD HH:MM:SS) and makes it a
+  # human-readable date (DD-Mon-YYYY). 
+  my $indate = $_[0];
+  my @sp = split / /, $indate;
+  my $date = $sp[0];
+  my @dates = split /-/, $date;
+  my @months = ('Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec');
+  my $mon = $dates[1] - 1;
+  my $readable_date = $dates[2]."-".$months[$mon]."-".$dates[0];
+  return $readable_date;
+}
+
 ##########
 # The following functions are designed to get the various dates available
 # from the output of a sequencing run and merge that data into the database
@@ -217,7 +282,6 @@ sub get_dates {
     }
     else {
       $analysis->add_date($date_type,$date);
-      
     }
   }
   

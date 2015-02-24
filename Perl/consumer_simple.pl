@@ -10,7 +10,7 @@ use Consumers;
 
 # This is used when printing out long strings, e.g., the program's inbuilt
 # help.
-$Text::Wrap::columns = 90;
+$Text::Wrap::columns = 150;
 
 # This is a consumer designed specifically to retrieve data parsed from
 # FastQC analysis. 
@@ -83,9 +83,18 @@ print "$check\n\n";
 # Bear in mind that if a sample is not from a multiplexed run, there
 # won't be a barcode listed. 
 if (($input_values->{SAMPLE}) && (!$input_values->{BARCODE})) {
-  $input_values->{BARCODE} = get_barcode_for_sample ($input_values->{SAMPLE});
+  $input_values->{BARCODE} = $confuncs->get_barcode_for_sample ($input_values->{SAMPLE});
 }
 
+# OK, inputs are good. Check for duplicated records corresponding to those
+# inputs.
+# Leave the session variable indicating selection type unset; the default behavious is what we want.
+my $duplicates = $confuncs->check_for_duplicated_data($input_values);
+if ($duplicates) {
+  print "WARN: the database contains duplicate records for some or all of the supplied parameters.\n".
+  "The following records are older duplicates:\n";
+  print $confuncs->make_printable_table($duplicates);
+}
 
 # Plan the set of queries for the consumer to go through (if more than one).
 # If no query scope is set, then a single query is carried out, based on the
@@ -105,7 +114,7 @@ else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions($input_values);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   print "@$column_headers\n";
   
   # Make returned column headers upper-case so they match the hash keys used
@@ -128,7 +137,7 @@ else {
     # Check that if sample names are represented, barcodes are too
     # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
     if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
-      my $bc = get_barcode_for_sample($qry{SAMPLE_NAME});
+      my $bc = $confuncs->get_barcode_for_sample($qry{SAMPLE_NAME});
       $qry{BARCODE} = $bc;
     }
     
@@ -167,7 +176,7 @@ foreach my $query_set (@query_sets) {
   # Those come from passing the relevant data to get_average_values
   my $qry = $reports->get_average_values(\%query_properties);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   
   # Rows: min seq length, total seqs, gc content, filtered seqs, max seq length,
   # total duplicate read percentage
@@ -195,7 +204,7 @@ foreach my $query_set (@query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  #($column_headers,$returned_values) = parse_query_results(\$avg);
+  #($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   ##@$returned_values = split /\n/, $avg;
   #
   #print "Querying analysis properties\nPROPERTY,VALUE\n";
@@ -295,7 +304,7 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my ($column_headers,$returned_values) = parse_query_results(\$dat);
+    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
     
     print "@$column_headers\n";
     
@@ -337,8 +346,8 @@ foreach my $query_set (@query_sets) {
     }
   }
   
-  @interval_names = remove_duplicates (@interval_names);
-  @base_intervals = remove_duplicates (@base_intervals);
+  @interval_names = $confuncs->remove_duplicates (\@interval_names);
+  @base_intervals = $confuncs->remove_duplicates (\@base_intervals);
   
   # Other data types that don't fall into classes along the length of
   # the reads need to be handled differently. Each might have its own
@@ -356,7 +365,7 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my ($column_headers,$returned_values) = parse_query_results(\$dat);
+    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
     
     print "@$column_headers\n";
     
@@ -402,7 +411,7 @@ foreach my $query_set (@query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  ($column_headers,$returned_values) = parse_query_results(\$dat);
+  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
   foreach my $ors (@$returned_values) {
@@ -443,81 +452,3 @@ $db->disconnect();
 
 print "Retrieval of data complete\n";
 
-
-sub get_barcode_for_sample {
-  my $samp = $_ [0];
-  
-  my $qry = $reports->get_barcodes_for_sample_name($samp);
-  my $dat = $qry->to_csv;
-  my @returned_values = split /\s/, $dat;
-  
-  my $bc = ();
-  my $column_headers = shift @returned_values;
-  if (@returned_values >= 1) {
-    $bc = shift @returned_values;
-  }
-  return $bc;
-}
-
-
-sub check_validity {
-  # Take the values passed into this script (hash)
-  # Pass that right on to the list_subdivisons or something
-  # If it returns a list of things, it's valid.
-  # If not, it's not.
-  # Simple.
-  my $in = $_ [0];
-  my %in = %$in;
-  
-  my $qry = $reports->list_subdivisions(\%in);
-  my $avg = $qry->to_csv;
-  my @returned_values = split /\n/, $avg;
-  
-  if (@returned_values <= 1) {
-    die "Input error:\n  Specified input parameters do not correspond to any records in the database.\n";
-  }
-  
-  return "Input validated";
-}
-
-
-sub remove_duplicates {
-  # Return an array with only one of each unique string.
-  my @in = @_;
-  my @out = ();
-  
-  my %chk = ();
-  foreach my $val (@in) {
-    unless ($chk{$val}) {
-      push @out, $val;
-    }
-    $chk {$val} = 1;
-  }
-  
-  return @out;
-}
-
-
-sub parse_query_results {
-  # Dealing with the csv data returned from a query requires several
-  # lines of scruffy code. This sub takes care of it much more neatly.
-  # Pass in a query results object and get back two array references:
-  # first, the column headers;
-  # second, an array of values per row, split on comma (since csv). 
-  my $in_ref = $_ [0];
-  my $in_string = $$in_ref;
-  
-  my @returned_values = split /\s/, $in_string;
-  
-  # The first line of this table is always the column headers
-  my $column_headers = shift @returned_values;
-  my @col_heads = split /,/,$column_headers;
-  
-  my @results = ();
-  foreach my $rv (@returned_values) {
-    my @dat = split /,/, $rv;
-    push @results, \@dat;
-  }
-  
-  return (\@col_heads, \@results);
-}

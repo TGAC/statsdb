@@ -140,7 +140,8 @@ sub parse_file {
   #$generic_analysis->add_property ("data_classification", $data_classification);
   # Try storing this property as 'encoding', since that's an appropriate term for
   # what each file holds.
-  $generic_analysis->add_property ("encoding", $data_classification);
+  # UPDATE: 'encoding' is in use by something else. Use 'interop_subtype'.
+  $generic_analysis->add_property ("interop_subtype", $data_classification);
   
   # Input comes in as a single file, but I need to output a distinct
   # object for each combination of lane, read and data type.

@@ -10,7 +10,7 @@ use Consumers;
 
 # This is used when printing out long strings, e.g., the program's inbuilt
 # help.
-$Text::Wrap::columns = 90;
+$Text::Wrap::columns = 150;
 
 # This is a consumer designed specifically to retrieve data parsed from
 # FastQC analysis. 
@@ -83,7 +83,19 @@ print "$check\n\n";
 # Bear in mind that if a sample is not from a multiplexed run, there
 # won't be a barcode listed. 
 if (($input_values->{SAMPLE}) && (!$input_values->{BARCODE})) {
-  $input_values->{BARCODE} = get_barcode_for_sample ($input_values->{SAMPLE});
+  $input_values->{BARCODE} = $confuncs->get_barcode_for_sample ($input_values->{SAMPLE});
+}
+
+# OK, inputs are good. Check for duplicated records corresponding to those
+# inputs.
+# Specify that we're looking for older duplicates here, in order to suggest
+# to the user that they be deleted.
+# Leave the session variable indicating selection type unset; the default behavious is what we want.
+my $duplicates = $confuncs->check_for_duplicated_data($input_values);
+if ($duplicates) {
+  print "WARN: the database contains duplicate records for some or all of the supplied parameters.\n".
+  "The following records are older duplicates:\n";
+  print $confuncs->make_printable_table($duplicates);
 }
 
 # Plan the set of queries for the consumer to go through (if more than one).
@@ -131,7 +143,7 @@ else {
     # Check that if sample names are represented, barcodes are too
     # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
     if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
-      my $bc = get_barcode_for_sample ($qry{SAMPLE_NAME});
+      my $bc = $confuncs->get_barcode_for_sample ($qry{SAMPLE_NAME});
       $qry{BARCODE} = $bc;
     }
     
@@ -223,14 +235,13 @@ foreach my $query_set (@query_sets) {
   # Those come from passing the relevant data to get_average_values
   my $qry = $reports->get_average_values(\%query_properties);
   my $avg = $qry->to_csv;
-  my @returned_values = split /\n/, $avg;
-  shift @returned_values;
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   
   # Rows: min seq length, total seqs, gc content, filtered seqs, max seq length,
   # total duplicate read percentage
   # Set up summary data hash to store this (and other) properties of this query set
   my %summarydata = ();
-  foreach my $row (@returned_values) {
+  foreach my $row (@$returned_values) {
     my @dat = split /,/, $row;
     my $desc = $dat [0];
     my $val  = $dat [1];
@@ -253,12 +264,10 @@ foreach my $query_set (@query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  
-  @returned_values = split /\n/, $avg;
-  $headers = shift @returned_values;
+  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   
   print "Querying analysis properties\nPROPERTY,VALUE\n";
-  foreach my $line (@returned_values) {
+  foreach my $line (@$returned_values) {
     my @sp = split /,/, $line;
     my $property = $sp [0]; my $value = $sp [1];
     
@@ -337,13 +346,11 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my @returned_values = split /\s/, $dat;
+    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
+    print "@$column_headers\n";
     
-    my $column_headers = shift @returned_values;
-    print "$column_headers\n";
-    
-    if (@returned_values >= 1) {
-      foreach my $rv (@returned_values) {
+    if (@$returned_values >= 1) {
+      foreach my $rv (@$returned_values) {
         $rv =~ s/,/\t/g;
         
         # Do something about the large number of decimal places. 3 ought to be plenty.
@@ -358,11 +365,11 @@ foreach my $query_set (@query_sets) {
         
         # Store the base interval of this particular record
         # Give as an interval, if possible.
-        my $basepos = $dat [0];
+        my $basepos = $dat[0];
         my $interval_name = $basepos;
-        if ($base_intervals [-1]) {
-          if ($base_intervals [-1] < ($basepos - 1)) {
-            $interval_name = ($base_intervals [-1] + 1)."-$basepos";
+        if ($base_intervals[-1]) {
+          if ($base_intervals[-1] < ($basepos - 1)) {
+            $interval_name = ($base_intervals[-1] + 1)."-$basepos";
           }
         }
         push @interval_names, $interval_name;
@@ -371,7 +378,7 @@ foreach my $query_set (@query_sets) {
         # Store the actual data in a hash of arrays, according to type
         # (It's pretty easy to retrieve later)
         # Column 3 holds the data.
-        push @{$qualdata{$valtype}}, $dat [2];
+        push @{$qualdata{$valtype}}, $dat[2];
         
         my $pout = join "\t", @dat;
         print "$pout\n";
@@ -383,8 +390,8 @@ foreach my $query_set (@query_sets) {
     }
   }
   
-  @interval_names = remove_duplicates (@interval_names);
-  @base_intervals = remove_duplicates (@base_intervals);
+  @interval_names = $confuncs->remove_duplicates(\@interval_names);
+  @base_intervals = $confuncs->remove_duplicates(\@base_intervals);
   
   # Other data types that don't fall into classes along the length of
   # the reads need to be handled differently. Each might have its own
@@ -402,17 +409,15 @@ foreach my $query_set (@query_sets) {
     
     my $qry = $reports->get_per_position_values($valtype, \%query_properties);
     my $dat = $qry->to_csv;
-    my @returned_values = split /\s/, $dat;
-    
-    my $column_headers = shift @returned_values;
-    print "$column_headers\n";
+    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
+    print "@$column_headers\n";
     
     # X axis values for these plots are single figures, rather than
     # intervals. That means no other manipulation is necessary.
     my @xvals = ();
     
-    if (@returned_values >= 1) {
-      foreach my $rv (@returned_values) {
+    if (@$returned_values >= 1) {
+      foreach my $rv (@$returned_values) {
         $rv =~ s/,/\t/g;
         
         # Do something about the large number of decimal places. 3 ought to be plenty.
@@ -451,11 +456,10 @@ foreach my $query_set (@query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  @returned_values = split /\n/, $dat;
-  my $column_headers = shift @returned_values;
+  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
-  foreach my $ors (@returned_values) {
+  foreach my $ors (@$returned_values) {
     $ors =~ s/,/\t/g;
     
     my @sp = split /\t/, $ors;
@@ -471,7 +475,7 @@ foreach my $query_set (@query_sets) {
     if ($comment) { push @{$overrepresented_sequences{"comments"}}, $comment; }
     else          { push @{$overrepresented_sequences{"comments"}}, " "; }
   }
-  if (@returned_values == 0) {
+  if (@$returned_values == 0) {
     print "None\n";
   }
   
@@ -483,239 +487,87 @@ foreach my $query_set (@query_sets) {
   
   # Most are just a little bit different from the others, so are scripted independently.
   
-  my @plots = ();
+  my @plotfiles = ();
+  my @datafiles = ();
   
   #####################
   # READ QUALITY PLOT #
   #####################
   print "Read quality plot\n";
-  open(DAT, '>', 'quality.df') or die "Cannot open quality data file for R input\n";
-  print DAT "Interval\t90th Percentile\tUpper Quartile\tMedian\tMean\tLower Quartile\t10th Percentile";
-  foreach my $interval (@interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata{'quality_90th_percentile'}};
-    push @line, shift @{$qualdata{'quality_upper_quartile'}};
-    push @line, shift @{$qualdata{'quality_median'}};
-    push @line, shift @{$qualdata{'quality_mean'}};
-    push @line, shift @{$qualdata{'quality_lower_quartile'}};
-    push @line, shift @{$qualdata{'quality_10th_percentile'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  my @argv = ('R --slave -f R/read_quality_graph.r');
-  system(@argv) == 0 or die "Unable to launch quality graph R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  my $plot = "quality_plot_q$qnum.pdf";
-  @argv = ("mv -f quality_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move quality plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  my ($plotfile,$datafile) = $confuncs->read_quality_plot(\@interval_names,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   #############################
   # QUALITY DISTRIBUTION PLOT #
   #############################
   print "Quality distribution plot\n";
-  open(DAT, '>', 'qual_dist.df') or die "Cannot open quality score distribution data file for R input\n";
-  print DAT "Xval\tQualDist";
   my @Xvals = @{$independent_interval_names{'quality_score_count'}};
-  foreach my $xval (@Xvals) {
-    my @line = ($xval);
-    push @line, shift @{$qualdata{'quality_score_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/quality_distribution.r');
-  system(@argv) == 0 or die "Unable to launch quality score distribution R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "qual_dist_plot_q$qnum.pdf";
-  @argv = ("mv -f qual_dist_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move quality score distribution plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->quality_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   #########################
   # SEQUENCE CONTENT PLOT #
   #########################
   print "Sequence content plot\n";
-  open(DAT, '>', 'seq_content.df') or die "Cannot open seq. content data file for R input\n";
-  print DAT "Interval\tA\tC\tT\tG";
-  foreach my $interval (@interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata{'base_content_a'}};
-    push @line, shift @{$qualdata{'base_content_c'}};
-    push @line, shift @{$qualdata{'base_content_t'}};
-    push @line, shift @{$qualdata{'base_content_g'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/sequence_content_across_reads.r');
-  system(@argv) == 0 or die "Unable to launch sequence content graph R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "sequence_content_plot_q$qnum.pdf";
-  @argv = ("mv -f sequence_content_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move sequence content plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->sequence_content_plot(\@interval_names,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   ###################
   # GC CONTENT PLOT #
   ###################
   print "GC content plot\n";
-  open(DAT, '>', 'gc_content.df') or die "Cannot open GC content data file for R input\n";
-  print DAT "Interval\tGC";
-  foreach my $interval (@interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata{'gc_content_percentage'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/gc_content_across_reads.r');
-  system(@argv) == 0 or die "Unable to launch GC content R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "gc_content_plot_q$qnum.pdf";
-  @argv = ("mv -f gc_content_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move GC content plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->gc_content_plot(\@interval_names,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   ########################
   # GC DISTRIBUTION PLOT #
   ########################
   print "GC distribution plot\n";
-  open(DAT, '>', 'gc_dist.df') or die "Cannot open GC distribution data file for R input\n";
-  print DAT "Xval\tGCDist";
   @Xvals = @{$independent_interval_names{'gc_content_count'}};
-  foreach my $xval (@Xvals) {
-    my @line = ($xval);
-    push @line, shift @{$qualdata{'gc_content_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/gc_distribution.r');
-  system(@argv) == 0 or die "Unable to launch GC distribution R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "gc_dist_plot_q$qnum.pdf";
-  @argv = ("mv -f gc_dist_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move GC distribution plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->gc_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   ##################
   # N CONTENT PLOT #
   ##################
   print "N content plot\n";
-  open(DAT, '>', 'n_content.df') or die "Cannot open N content data file for R input\n";
-  print DAT "Interval\tN";
-  foreach my $interval (@interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata{'base_content_n_percentage'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/n_content_across_reads.r');
-  system(@argv) == 0 or die "Unable to launch N content R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "n_content_plot_q$qnum.pdf";
-  @argv = ("mv -f n_content_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move N content plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->n_content_plot(\@interval_names,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   ############################
   # LENGTH DISTRIBUTION PLOT #
   ############################
   print "Length distribution plot\n";
-  open(DAT, '>', 'length_dist.df') or die "Cannot open length distribution data file for R input\n";
-  print DAT "Xval\tLengthDist";
   @Xvals = @{$independent_interval_names{'sequence_length_count'}};
-  
-  # In the case of Illumina reads, there will only be one entry here.
-  # Put one either side, in order to replicate the FastQC plot.
-  if (@Xvals == 1) {
-    my $num = $Xvals [0];
-    unshift @Xvals, $num - 1;
-    unshift @{$qualdata{'sequence_length_count'}}, '0.0';
-    push @Xvals,    $num + 1;
-    push @{$qualdata{'sequence_length_count'}}, '0.0';
-  }
-  
-  foreach my $xval (@Xvals) {
-    my @line = ($xval);
-    push @line, shift @{$qualdata{'sequence_length_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/length_distribution.r');
-  system(@argv) == 0 or die "Unable to launch length distribution R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "length_dist_plot_q$qnum.pdf";
-  @argv = ("mv -f length_dist_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move length distribution plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->length_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   #############################
   # SEQUENCE DUPLICATION PLOT #
   #############################
   print "Sequence distribution plot\n";
-  open(DAT, '>', 'seq_dupe.df') or die "Cannot open sequence duplication data file for R input\n";
-  print DAT "Xval\tSequenceDuplication";
   @Xvals = @{$independent_interval_names{'duplication_level_relative_count'}};
-  
-  # The final X value in this plot represents all duplicates present n OR MORE
-  # times. The final figure in @Xvals should have a '+' added to show that.
-  my $i = $Xvals [-1];
-  $i = $i.'+';
-  $Xvals [-1] = $i;
-  
-  foreach my $xval (@Xvals) {
-    my @line = ($xval);
-    push @line, shift @{$qualdata{'duplication_level_relative_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  
-  # And execute the R script!
-  @argv = ('R --slave -f R/sequence_duplication.r');
-  system(@argv) == 0 or die "Unable to launch sequence duplication R script\n";
-  
-  # Move the plot somewhere for safe keeping
-  $plot = "seq_dupe_plot_q$qnum.pdf";
-  @argv = ("mv -f seq_dupe_plot.pdf R/Plots/$plot");
-  system(@argv) == 0 or die "Unable to move sequence duplication plot to /Plots directory\n";
-  push @plots, $plot;
-  
+  ($plotfile,$datafile) = $confuncs->sequence_duplication_plot(\@Xvals,\%qualdata,$qnum);
+  push @plotfiles, $plotfile;
+  push @datafiles, $datafile;
   
   # Delete data files
-  unlink "quality.df";
-  unlink "seq_content.df";
-  unlink "gc_content.df";
-  unlink "n_content.df";
-  unlink "qual_dist.df";
-  unlink "gc_dist.df";
-  unlink "length_dist.df";
-  unlink "seq_dupe.df";
+  #unlink "quality.df";
+  #unlink "seq_content.df";
+  #unlink "gc_content.df";
+  #unlink "n_content.df";
+  #unlink "qual_dist.df";
+  #unlink "gc_dist.df";
+  #unlink "length_dist.df";
+  #unlink "seq_dupe.df";
+  foreach my $data (@datafiles) { unlink $data; }
   
   
   ##########
@@ -741,7 +593,7 @@ foreach my $query_set (@query_sets) {
   print TEX $line;
   
   my $leftright = 'l';
-  foreach my $plot (@plots) {
+  foreach my $plot (@plotfiles) {
     my $line = $texcode{"include_img"};
     $line =~ s/img/$plot/;
     
@@ -864,7 +716,7 @@ foreach my $query_set (@query_sets) {
       $name =~ s/_/\\_/g;
       $name =~ s/%/\\%/g;
       
-      @dat = remove_duplicates(@dat);
+      @dat = $confuncs->remove_duplicates(\@dat);
       
       if (@dat == 1) {
         my $val = $dat [0];
@@ -943,57 +795,3 @@ system(@argv) == 0 or die "Cannot automatically convert quality_report.tex to PD
 $db->disconnect();
 
 print "Retrieval of data complete\n";
-
-
-sub get_barcode_for_sample {
-  my $samp = $_ [0];
-  
-  my $qry = $reports->get_barcodes_for_sample_name($samp);
-  my $dat = $qry->to_csv;
-  my @returned_values = split /\s/, $dat;
-  
-  my $bc = ();
-  my $column_headers = shift @returned_values;
-  if (@returned_values >= 1) {
-    $bc = shift @returned_values;
-  }
-  return $bc;
-}
-
-
-sub check_validity {
-  # Take the values passed into this script (hash)
-  # Pass that right on to list_subdivisons 
-  # If it returns a list of things (beyond column headers), it's valid.
-  # If not, it's not.
-  # Simple.
-  my $in = $_ [0];
-  my %in = %$in;
-  
-  my $qry = $reports->list_subdivisions(\%in);
-  my $avg = $qry->to_csv;
-  my @returned_values = split /\n/, $avg;
-  
-  if (@returned_values <= 1) {
-    die "Input error:\n  Specified input parameters do not correspond to any records in the database.\n";
-  }
-  
-  return "Input validated";
-}
-
-
-sub remove_duplicates {
-  # Return an array with only one of each unique string.
-  my @in = @_;
-  my @out = ();
-  
-  my %chk = ();
-  foreach my $val (@in) {
-    unless ($chk{$val}) {
-      push @out, $val;
-    }
-    $chk {$val} = 1;
-  }
-  
-  return @out;
-}

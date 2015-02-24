@@ -1,3 +1,5 @@
+args <- commandArgs(trailingOnly = TRUE)
+qnum <- args[0]
 
 qualdata <- read.delim("gc_dist.df", header = TRUE, as.is = TRUE)
 
@@ -6,7 +8,9 @@ qualdata <- read.delim("gc_dist.df", header = TRUE, as.is = TRUE)
 xVals <- seq (from = 1, to = max(qualdata$Xval), by = 1) 
 xTags <- seq (from = 0, to = max(qualdata$Xval), by = 1)
 
-pdf(file = "gc_dist_plot.pdf", width = 8, height = 6)
+plotName <- paste("gc_dist_plot_q", qnum, ".pdf", sep="")
+pdf(file = plotName, width = 8, height = 6)
+print(paste("PLOT FILE:",plotName))
 
 marginSpaces = c(1, 0.1, 0)
 par (mgp = marginSpaces, tcl = -0.2)
