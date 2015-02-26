@@ -8,6 +8,7 @@ percentvals = seq (from = 0, to = 100, by = 10)
 plotName <- paste("seq_dupe_plot_q", qnum, ".pdf", sep="")
 pdf(file = plotName, width = 8, height = 6)
 print(paste("PLOT FILE:",plotName))
+flush.console()
 
 marginSpaces = c(1, 0.1, 0)
 par (mgp = marginSpaces, tcl = -0.2)

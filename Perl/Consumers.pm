@@ -682,20 +682,25 @@ sub call_rscript {
   # seem to remember having some kind of trouble with that.
   # Note that R scripts should all return the name of the plot file.
   # (Should probably implement a check for errors or something)
-  my @argv = ("R --slave -f R/$func.r");
+  #my @argv = ("R --slave -f R/$func.r");
+  my @argv = ("Rscript R/$func.r");
   if (ref $args) {
-    $argv[0] .= " --args";
+    #$argv[0] .= " --args";
     foreach my $arg (@$args) { $argv[0] .= " $arg"; }
   }
   elsif ($args) { print "ERROR: option \$args should be an array reference when calling R script $func\n"; }
   
-  my $Rout = system(@argv) == 0 or die "ERROR: Unable to launch $func R script\n";
+  #my $Rout = system(@argv) == 0 or die "ERROR: Unable to launch $func R script\n";
+  my $Rout = `$argv[0]` or die "ERROR: Unable to launch $func R script\n";
+  
   my @Rout = split /\n/, $Rout;
   my $plot = ();
   foreach my $line (@Rout) {
+    chomp $line;
     if ($line =~ /PLOT FILE: /) {
       $plot = $line;
-      $plot =~ s/PLOT FILE: //g;
+      $plot =~ s/\"//g;
+      $plot =~ s/.*PLOT FILE: //g;
       chomp $plot;
     }
   }
@@ -706,7 +711,7 @@ sub call_rscript {
   if ($plot) {
     # NOTE: if using ggplot, I can easily save it to the right place within R, so I tend to
     # do it there. Only lauch this mv if it's actually necessary
-    if (-e $plot) {
+    if ((-e $plot) && ($plot !~ /^R\/Plots\/.*/)) {
       @argv = ("mv -f $plot R/Plots/$plot");
       system(@argv) == 0 or die "ERROR: Unable to move quality plot to /Plots directory\n";
     }
@@ -999,9 +1004,9 @@ sub machine_activity_plot {
   my $rscript = "instrument_activity_plot";
   
   open(DAT, '>', $datafile) or die "Cannot open operations data file $datafile for R input\n";
-  print DAT "DATE_TYPE,DATE,INSTRUMENT,RUN,LANE,PAIR";
+  print DAT "DATE_TYPE,DATE,INSTRUMENT,RUN,LANE,PAIR\n";
   foreach my $line (@$qualdata) {
-    print DAT "\n$line";
+    print DAT "$line\n";
   }
   close DAT;
   
@@ -1031,12 +1036,12 @@ sub adapter_performance_barplot {
   my @sample_names = sort {$a cmp $b} keys $data;
   
   open(DAT, '>', $datafile) or die "Cannot open operations data file $datafile for R input\n";
-  print DAT "sampleName,readCount,barcode";
+  print DAT "sampleName,readCount,barcode\n";
   foreach my $sample_name (@sample_names) {
-    print DAT "$sample_name,".$data->{$sample_name}.",".$tags->{$sample_name};
+    print DAT "$sample_name,".$data->{$sample_name}.",".$tags->{$sample_name}."\n";
   }
   close DAT;
-  die;
+  
   # Set up arguments
   my @args = ("'".$title."' $lane");
   
@@ -1052,10 +1057,7 @@ sub adapter_performance_barplot {
 my %texcode = ();
 $texcode {"open_fig"} =
 "\\begin{figure}[htp]
-\\large
-{\\bf LABEL}
-\\\\
-{\\bf READS_FILE}\n";
+";
 
 $texcode{"left_img"} =
 "\n\\begin{minipage}{0.45\\textwidth}
@@ -1141,7 +1143,14 @@ sub make_simple_table {
   # Set number of columns in this tabular environment
   foreach my $col (@$data) { $string .= 'l'; }
   $string .= '}';
-  $string .= "\n\t". join ' & ', @$headers."\\\\"."\n\t".'\hline'."\n";
+  
+  my $line = join ' & ', @$headers;
+  # When producing a multi-line header, that join can result in lower lines having too many '&'
+  # symbols, resulting in a failed LaTeX conversion. In other words, a '&' gets written before the
+  # first cell. Remove it here.
+  $line =~ s/\n \&/\n /g;
+  
+  $string .= "\n\t"."$line \\\\"."\n\t".'\hline'."\n";
   
   foreach my $row (1..$numrows) {
     $row --;
@@ -1149,16 +1158,18 @@ sub make_simple_table {
     foreach my $col (@$data) {
       push @rowdata, $col->[$row];
     }
-    $string .= "\t".join ' & ', @rowdata."\\\\"."\n";
+    $line = join ' & ', @rowdata;
+    $string .= "\t$line \\\\"."\n";
   }
   
-  $string .= "\\end{tabular}\n";
+  $string .= "\\end{tabular}\n\\vspace{4mm}";
   return $string;
 }
 
 sub make_simple_figure {
   # Plant a single, full-width figure down. 
-  my $img = $_[0];
+  my $self = shift;
+  my $img = shift;
   
   # This might need some work yet.
   my $fig =
@@ -1175,6 +1186,10 @@ sub make_fastqc_report_figure {
   # These appear in a 2X4 grid.
   my $self = shift;
   my $plotfiles = shift;
+  # Text1 will, in the context of FastQC diagrams, be the run ID
+  # Text2 will be the filename containing all the reads.
+  my $text1 = shift;
+  my $text2 = shift;
   
   if (@$plotfiles > 8) {
     die "ERROR: incorrect number of plot files (".@$plotfiles." > 8) supplied to LaTeX figure generator\n";
@@ -1185,6 +1200,17 @@ sub make_fastqc_report_figure {
   my $string = $texcode{"open_fig"};
   $string =~ s/_/\\_/g;
   $string =~ s/%/\\%/g;
+  
+  if ($text1) {
+    $string .= "\\large
+{\\bf $text1} \\\\
+\normalsize\n";
+  }
+  if ($text2) {
+    $string .= "\\large
+{\\bf $text2} \\\\
+\normalsize\n";
+  }
   
   # I reuse this sub somewhere else, in a different context. In that case, then there might be either
   # 1, 2 or 8 plots supplied. That means I have to add the capability to deal with odd numbers of
@@ -1222,7 +1248,8 @@ sub latex_to_pdf {
   my $latex = shift;
   
   my @argv = ('pdflatex '.$latex);
-  system(@argv) == 0 or die "Cannot automatically convert $latex to PDF\n";
+  #system(@argv) == 0 or die "Cannot automatically convert $latex to PDF\n";
+  my $cl = `$argv[0]` or die "Cannot automatically convert $latex to PDF\n";
 }
 
 

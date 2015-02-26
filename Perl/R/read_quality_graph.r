@@ -12,6 +12,7 @@ z <- list(stats = datmat, names = qualdata$Interval)
 plotName <- paste("quality_plot_q", qnum, ".pdf", sep="")
 pdf(file = plotName, width = 8, height = 6)
 print(paste("PLOT FILE:",plotName))
+flush.console()
 
 bxp (z, 
      axes=FALSE,

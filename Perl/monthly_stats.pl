@@ -299,6 +299,7 @@ foreach my $runID (@runs_in_range) {
     my ($numreads,$lane,$pair,$sample_name,$barcode) = @sp;
     
     $num_reads{$runID}{$lane}{$sample_name} += $numreads;
+    if (!$barcode) { $barcode = 'NoIndex'; }
     $barcodes{$runID}{$lane}{$sample_name} = $barcode;
   }
   
@@ -429,17 +430,16 @@ print "+-".("-" x $l1)."-+-".("-" x $l2)."-+-".("-" x $l3)."-+
 ";
 
 # Set up this table as a more manageable structure too
-@labels = ('Runs','Bases','Sequences','Samples','Clusters','Clusters passed filter');
 my @lib_table = ();
-push @lib_table, [@labels];
 # This table needs two data columns: proportion of total (as percent), and frequency.
 my @lib_table_proportion = ();
 foreach my $value (@tablines) {
   push @lib_table_proportion, (($value / $sumvals) * 100);
 }
 push @lib_table, [@tablabs];
-push @lib_table, [@tablines];
 push @lib_table, [@lib_table_proportion];
+push @lib_table, [@tablines];
+
 
 # Error rate?
 # In the future maybe.
@@ -498,12 +498,9 @@ print "\n+";
 foreach my $l (@tabls) { print "-".("-" x $l)."-+"; }
 print "\n|";
 # Make a line for every instrument
-my @con_table = ();
+my %con_table_data = ();
 foreach my $instrument (sort {$a cmp $b} keys %statsdb_instruments) {
   print " $instrument".(" " x ($tabls[0] - length($instrument)))." |";
-  
-  my @line = ();
-  push @line, $instrument;
   
   foreach my $c (1..@contaminants) {
     $c--;
@@ -532,17 +529,23 @@ foreach my $instrument (sort {$a cmp $b} keys %statsdb_instruments) {
     print $numstring;
     print " " x ($colsize - length($numstring) + 1)." |";
     
-    push @line, $refmean;
-    push @line, $readmean;
+    push @{$con_table_data{"$ref-ref"}}, $refmean;
+    push @{$con_table_data{"$ref-read"}}, $readmean;
   }
   
   print "\n+";
-  
-  push @con_table, [@line];
 }
 # Draw bottom line
 foreach my $l (@tabls) { print "-".("-" x $l)."-+"; }
 print "\n";
+
+# Sort this out into a more manageable data structure too
+my @con_table = ();
+push @con_table, [sort {$a cmp $b} keys %statsdb_instruments];
+foreach my $ref (@contaminants) {
+  push @con_table, [@{$con_table_data{"$ref-ref"}}];
+  push @con_table, [@{$con_table_data{"$ref-read"}}];
+}
 
 
 # In @timedata, I have a list of all the op times of all the runs of any relevance here.
@@ -723,12 +726,15 @@ RUN: foreach my $run (@$allrunsdata) {
     #print Dumper($run);
     #my $rngoerigeg = <STDIN>;
     
-    #print "\n";
+    
   }
 }
+print "\n";
 
 # Pack that data off to R to be plotted
-my ($plot, $timedataFile) = $confuncs->machine_activity_plot($input_values,\@timedata);
+#my ($plot, $timedataFile) = $confuncs->machine_activity_plot($input_values,\@timedata);
+# Commented out for now due to lack of lubridate.
+my $plot = "ops_plot.pdf";
 
 #########
 # LaTeX #
@@ -749,8 +755,9 @@ my $texstr = $confuncs->new_texdoc();
 print TEX $texstr;
 
 # Print a big header thing
-print TEX "\\large
-{\\bf Operations overview}
+print TEX "\\setlength{\\parindent}{0pt}
+\\large
+{\\bf Operations overview} \\\\
 {\\bf $hr_startdate to $hr_enddate}
 \\vspace{4 mm}
 \\normalsize
@@ -852,13 +859,13 @@ foreach my $instrument (keys %allinstruments) {
 }
 
 $l2 = length "% ACTIVITY";
-my @act_table = ();
+
 print "ACTIVITY LEVEL OF INSTRUMENTS OVER INTERVAL
 +-".("-" x $l1)."-+-".("-" x $l2)."-+
 | INSTRUMENT".(" " x ($l1 - length "INSTRUMENT"))." | % ACTIVITY".(" " x ($l2 - length "% ACTIVITY"))." |
 +-".("-" x $l1)."-+-".("-" x $l2)."-+
 ";
-
+my @active_pc = ();
 foreach my $instrument (sort {$a cmp $b} keys %allinstruments) {
   my $inactive = $instrumenttimes{$instrument} / $total_time;
   my $active = 1 - $inactive;
@@ -867,14 +874,15 @@ foreach my $instrument (sort {$a cmp $b} keys %allinstruments) {
   my $inactive_pc = $confuncs->round_to_x_places(($inactive * 100), 2);
   
   print "| ".$instrument.(" " x ($l1 - length $instrument))." | ".(" " x ($l2 - length $active_pc)).$active_pc." |\n";
-  my @line = ($instrument, $active_pc);
-  push @act_table, [@line];
+  push @active_pc, $active_pc;
 }
 
 print "+-".("-" x $l1)."-+-".("-" x $l2)."-+
 
 ";
-
+my @act_table = ();
+push @act_table, [sort {$a cmp $b} keys %allinstruments];
+push @act_table, [@active_pc];
 
 
 # I could also remake all the tables I put on the command line earlier in latex.
@@ -882,8 +890,11 @@ print "+-".("-" x $l1)."-+-".("-" x $l2)."-+
 # Data for the tables produced so far is in @sum_table, @avg_table, @lib_table, @con_table
 # and @act_table.
 
+# Tables here should be in small-size text
+print TEX "\n\\footnotesize\n";
+
 # Sums table
-print TEX "\n{\\bf Sums & averages}\n\\vspace{4mm}";
+print TEX "\n{\\bf Sums \\& averages}\n\\vspace{4mm}\n\n";
 my @headers = ('Totals', ' ');
 $texstr = $confuncs->make_simple_table(\@headers, \@sum_table);
 print TEX "$texstr\n\n";
@@ -894,8 +905,8 @@ $texstr = $confuncs->make_simple_table(\@headers, \@avg_table);
 print TEX "$texstr\n\n";
 
 # Libraries table
-print TEX "\n{\\bf Library types}\n\\vspace{4mm}";
-@headers = ('Library type', 'Proportion','Frequency');
+print TEX "\n{\\bf Library types}\n\\vspace{4mm}\n\n";
+@headers = ('Library type', 'Proportion (\%)','Frequency');
 $texstr = $confuncs->make_simple_table(\@headers, \@lib_table);
 print TEX "$texstr\n\n";
 
@@ -904,11 +915,14 @@ print TEX "$texstr\n\n";
 # The two lines can be achieved just by writing them as two lines in the header string. Note the
 # bunch of backslashes. Then the rest of the data goes in just like normal.
 # Use the multiline package to make double-width cells.
+print TEX "\n{\\bf Contaminant screening summary}\n\\vspace{4mm}\n\n";
 @headers = ('Contaminant');
 $c = 0;
 foreach my $contaminant (@contaminants) {
   $c ++;
-  my $string = "\\multirow{2}{*}{".$contaminant.'}';
+  my $print_con = $contaminant;
+  $print_con =~ s/_/\\_/g;
+  my $string = "\\multicolumn{2}{l}{".$print_con.'}';
   if ($c == @contaminants) {
     $string .= " \\\\ \n";
   }
@@ -917,15 +931,15 @@ foreach my $contaminant (@contaminants) {
 # Second line too
 push @headers, 'Instrument';
 foreach my $contaminant (@contaminants) {
-  push @headers, '\% ref';
-  push @headers, '\% reads';
+  push @headers, '\%ref';
+  push @headers, '\%reads';
 }
-$texstr = $confuncs->make_simple_table(\@headers, \@con_table);
+$texstr = $confuncs->make_simple_table(\@headers, \@con_table, 1);
 print TEX "$texstr\n\n";
 
 # Activity table
-print TEX "\n{\\bf Instrument activity}\n\\vspace{4mm}";
-@headers = ('Instrument', 'Activity');
+print TEX "\n{\\bf Instrument activity}\n\\vspace{4mm}\n\n";
+@headers = ('Instrument', 'Activity (\%)');
 $texstr = $confuncs->make_simple_table(\@headers, \@act_table);
 print TEX "$texstr\n\n";
 
@@ -936,26 +950,25 @@ print TEX $texstr;
 # One more thing: adapter performance.
 # This won't get displayed on the command line at all - it will go straight to R
 # and LaTeX, because I can't think of a good way of meaningfully summarising it in a single
-# neat little package. 
-print TEX "{\\bf Adapter performance overview}\n";
-foreach my $run (@$allrunsdata) {
+# neat little package.
+# Note: this can only display runs taken from StatsDB, where this information is available.
+print TEX "\\large\n{\\bf Adapter performance overview} \\\\ \n\\normalsize\n\n";
+foreach my $run (@runs_in_range) {
   # Make a plot for each lane in this run
   my @plots = ();
-  my @lanes = sort {$a <=> $b} keys $num_reads{$run};
+  my @lanes = sort {$a <=> $b} keys %{$num_reads{$run}};
   foreach my $lane (@lanes) {
-    my $relevant_data = $num_reads{$run}{$lane};
-    my $tags = $barcodes{$run}{$lane};
-    my ($plotfile,$datafile) = $confuncs->adapter_performance_barplot($relevant_data,$tags,"PLOT FOR WHATEVER");
+    my ($plotfile,$datafile) = $confuncs->adapter_performance_barplot($num_reads{$run}{$lane},$barcodes{$run}{$lane},"Lane $lane");
     push @plots, $plotfile;
   }
   
+  # The underscore must be escaped in latex docs. Make it so here.
+  my $printable_run = $run;
+  $printable_run =~ s/_/\\_/g;
+  
   # Wrangle all this run's plots into a single neat figure
   # Print a bit of text saying which run this is first.
-  print TEX "\\large
-{\\bf Run $run}
-\\vspace{2 mm}
-\\normalsize
-";
+  print TEX "{\\bf Run $printable_run} \\\\ \n";
   
   $texstr = $confuncs->make_fastqc_report_figure(\@plots);
   print TEX $texstr;

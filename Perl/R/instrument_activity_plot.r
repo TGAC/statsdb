@@ -6,7 +6,7 @@ args <- commandArgs(trailingOnly = TRUE)
 intervalStart <- ymd_hms(args[1], tz = "GMT")
 intervalEnd   <- ymd_hms(args[2], tz = "GMT")
 
-qualdata <- read.csv("../ops-dates.txt", header = TRUE, as.is = TRUE)
+qualdata <- read.csv("ops_dates.txt", header = TRUE, as.is = TRUE)
 
 # Got to wrangle the dates in qualdata into actual dates, rather than strings
 d <- ymd_hms(qualdata[,"DATE"], tz="GMT")
@@ -53,7 +53,7 @@ p <- p + geom_segment(data = wrangledData,
                           yend=LANE,
                           colour=PAIR
                           ),
-                      size=3)
+                      size=1.4)
 p <- p + facet_grid(INSTRUMENT ~ . , 
                     scales="free_y"
                     )
@@ -65,9 +65,12 @@ p <- p + ggtitle("Overview of instrument activity")
 p <- p + theme_bw()
 p <- p + theme(axis.text.x = element_text(angle=45, hjust=1), 
                axis.ticks.y = element_blank(), 
-               axis.text.y = element_blank())
+               axis.text.y = element_blank(),
+               panel.grid.minor.y=element_blank(),
+               panel.grid.major.y=element_blank())
 
-filename <- paste("plots/ops_plot.pdf", sep = "")
+filename <- paste("R/Plots/ops_plot.pdf", sep = "")
 ggsave(plot=p, file=filename, width=7, height=7)
 
-print("PLOT FILE: ops_plot.pdf")
+print(paste("PLOT FILE:", filename))
+flush.console()
