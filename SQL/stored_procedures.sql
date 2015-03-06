@@ -59,7 +59,8 @@ END$$
 DROP PROCEDURE IF EXISTS select_runs_between_dates$$
 CREATE PROCEDURE select_runs_between_dates(
 	IN date1 TIMESTAMP,
-	IN date2 TIMESTAMP)
+	IN date2 TIMESTAMP,
+	IN date_type VARCHAR(500))
 BEGIN
 	DECLARE hold TIMESTAMP;
 	IF (date2 < date1) THEN
@@ -130,7 +131,7 @@ BEGIN
 	;
 	
 	SELECT DISTINCT
-	value as libray_type
+	value as library_type
 	FROM analysis_property
 	WHERE property = ''
 	AND analysis_id IN (SELECT * FROM analysis_ids_tmp)
@@ -1344,6 +1345,261 @@ BEGIN
     DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 	DROP TEMPORARY TABLE subdivisions_tmp;
 	DROP TEMPORARY TABLE subdivisions_tmp_2;
+END$$
+
+DROP PROCEDURE IF EXISTS analysis_values_for_run$$
+CREATE PROCEDURE analysis_values_for_run(
+    IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+	IN tool_in VARCHAR(500))
+BEGIN
+	-- Idea with this is to make some nice, fast queries that get
+	-- ALL analysis values for a given query set
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS picked_properties;
+	CREATE TEMPORARY TABLE picked_properties ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool
+	FROM analysis_ids_tmp AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS analysis_data;
+	CREATE TEMPORARY TABLE analysis_data ENGINE=INNODB AS
+	SELECT * 
+	FROM analysis_value
+	WHERE analysis_id IN (SELECT * FROM analysis_ids_tmp)
+	;
+	
+	SELECT
+		pos.value,
+		vt.description AS description,
+		pp.instrument AS instrument,
+		pp.run AS run,
+		pp.lane AS lane,
+		pp.pair AS pair,
+		pp.sample_name AS sample_name,
+		pp.barcode AS barcode,
+		pp.tool AS tool
+	FROM analysis_data AS pos
+	INNER JOIN value_type AS vt 
+		ON pos.value_type_id = vt.id
+	INNER JOIN picked_properties AS pp
+		ON pos.analysis_id = pp.analysis_id
+	;
+END$$
+
+DROP PROCEDURE IF EXISTS position_values_for_run$$
+CREATE PROCEDURE position_values_for_run(
+    IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+	IN tool_in VARCHAR(500))
+BEGIN
+	-- Idea with this is to make some nice, fast queries that get
+	-- ALL position values for a given query set
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS picked_properties;
+	CREATE TEMPORARY TABLE picked_properties ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool
+	FROM analysis_ids_tmp AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS position_data;
+	CREATE TEMPORARY TABLE position_data ENGINE=INNODB AS
+	SELECT * 
+	FROM per_position_value
+	WHERE analysis_id IN (SELECT * FROM analysis_ids_tmp)
+	;
+	
+	SELECT
+		pos.position,
+		pos.value,
+		vt.description AS description,
+		pp.instrument AS instrument,
+		pp.run AS run,
+		pp.lane AS lane,
+		pp.pair AS pair,
+		pp.sample_name AS sample_name,
+		pp.barcode AS barcode,
+		pp.tool AS tool
+	FROM position_data AS pos
+	INNER JOIN value_type AS vt 
+		ON pos.value_type_id = vt.id
+	INNER JOIN picked_properties AS pp
+		ON pos.analysis_id = pp.analysis_id
+	;
+END$$
+
+DROP PROCEDURE IF EXISTS partition_values_for_run$$
+CREATE PROCEDURE partition_values_for_run(
+    IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+	IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500),
+	IN tool_in VARCHAR(500))
+BEGIN
+	-- Idea with this is to make some nice, fast queries that get
+	-- ALL partition values for a given query set
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		tool_in)
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS picked_properties;
+	CREATE TEMPORARY TABLE picked_properties ENGINE=INNODB AS
+	SELECT DISTINCT
+		tmp.analysis_id as analysis_id,
+		ins.value AS instrument,
+		rn.value AS run,
+		ln.value AS lane,
+		pr.value AS pair,
+		sn.value AS sample_name,
+		bc.value AS barcode,
+		tl.value AS tool
+	FROM analysis_ids_tmp AS tmp
+	INNER JOIN analysis AS d 
+		ON tmp.analysis_id = d.id
+	INNER JOIN analysis_property AS ins 
+		ON tmp.analysis_id = ins.analysis_id 
+		AND ins.property = 'instrument'
+	INNER JOIN analysis_property AS rn 
+		ON tmp.analysis_id = rn.analysis_id 
+		AND rn.property = 'run'
+	INNER JOIN analysis_property AS ln 
+		ON tmp.analysis_id = ln.analysis_id 
+		AND ln.property = 'lane'
+	INNER JOIN analysis_property AS pr 
+		ON tmp.analysis_id = pr.analysis_id 
+		AND pr.property = 'pair'
+	INNER JOIN analysis_property AS sn 
+		ON tmp.analysis_id = sn.analysis_id 
+		AND sn.property = 'sample_name'
+	INNER JOIN analysis_property AS bc 
+		ON tmp.analysis_id = bc.analysis_id 
+		AND bc.property = 'barcode'
+	INNER JOIN analysis_property AS tl 
+		ON tmp.analysis_id = tl.analysis_id 
+		AND tl.property = 'tool'
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS partition_data;
+	CREATE TEMPORARY TABLE partition_data ENGINE=INNODB AS
+	SELECT * 
+	FROM per_partition_value
+	WHERE analysis_id IN (SELECT * FROM analysis_ids_tmp)
+	;
+	
+	SELECT
+		pos.position,
+		pos.size,
+		pos.value,
+		vt.description AS description,
+		pp.instrument AS instrument,
+		pp.run AS run,
+		pp.lane AS lane,
+		pp.pair AS pair,
+		pp.sample_name AS sample_name,
+		pp.barcode AS barcode,
+		pp.tool AS tool
+	FROM partition_data AS pos
+	INNER JOIN value_type AS vt 
+		ON pos.value_type_id = vt.id
+	INNER JOIN picked_properties AS pp
+		ON pos.analysis_id = pp.analysis_id
+	;
 END$$
 
 DROP PROCEDURE IF EXISTS summary_value_with_comment$$
