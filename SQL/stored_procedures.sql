@@ -27,7 +27,7 @@ BEGIN
 	GROUP BY value_type.id, position, size;
 END$$
 
-DROP PROCEDURE IF EXISTS list_summary_per_scope $$
+DROP PROCEDURE IF EXISTS list_summary_per_scope$$
 CREATE PROCEDURE  list_summary_per_scope(
     IN scope_l VARCHAR(45))
 BEGIN 
@@ -92,7 +92,7 @@ BEGIN
 	DROP TEMPORARY TABLE IF EXISTS rundates_tmp;
 	CREATE TEMPORARY TABLE rundates_tmp ENGINE=INNODB AS
 	SELECT DISTINCT
-		#pr.analysis_id as analysis,
+		--pr.analysis_id as analysis,
 		d.property as date_type,
 		d.date as date,
 		pr.value AS instrument,
@@ -118,7 +118,7 @@ BEGIN
 	;
 	
 	DROP TEMPORARY TABLE IF EXISTS rundates_tmp;
-END
+END$$
 
 DROP PROCEDURE IF EXISTS get_lib_type_for_run$$
 CREATE PROCEDURE get_lib_type_for_run(
@@ -138,7 +138,7 @@ BEGIN
 	;
 	
 	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
-END
+END$$
 
 DROP PROCEDURE IF EXISTS general_summary$$
 CREATE PROCEDURE general_summary(
@@ -176,7 +176,7 @@ BEGIN
 		AND property = analysis_property
 		AND analysis_property.value = analysis_property_value
 	GROUP BY value_type.id, description;
-END $$
+END$$
 
 CREATE OR REPLACE VIEW property
 AS
@@ -639,7 +639,7 @@ get_ids:BEGIN
 		LEAVE get_ids;
 	END IF;
 	
-	# Pull in other identifying info for the run IDs
+	-- Pull in other identifying info for the run IDs
 	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
 	CREATE TEMPORARY TABLE an_ids_tmp2 ENGINE=INNODB AS
 	SELECT DISTINCT
@@ -765,11 +765,11 @@ CREATE PROCEDURE set_duplicate_selection_type(
     IN type_in VARCHAR(3))
 BEGIN
 	SET @duplicate_selection = type_in;
-END
+END$$
 
 DROP PROCEDURE IF EXISTS detect_duplicates$$
 CREATE PROCEDURE detect_duplicates(
-IN instrument_in VARCHAR(500),
+	IN instrument_in VARCHAR(500),
 	IN run_in VARCHAR(500),
 	IN lane_in VARCHAR(500),
 	IN pair_in VARCHAR(500),
@@ -1336,7 +1336,7 @@ BEGIN
 		CASE WHEN lane_in IS NOT NULL THEN lane END AS lane,
 		CASE WHEN pair_in IS NOT NULL THEN pair END AS pair,
 		CASE WHEN sample_name_in IS NOT NULL THEN sample_name END AS sample_name,
-		CASE WHEN barcode_in IS NOT NULL THEN barcode END AS barcode
+		CASE WHEN barcode_in IS NOT NULL THEN barcode END AS barcode,
         tool as tool
 		FROM subdivisions_tmp_2
 		ORDER BY instrument, run, lane, pair, sample_name, barcode
