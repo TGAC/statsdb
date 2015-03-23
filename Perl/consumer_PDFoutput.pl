@@ -320,6 +320,11 @@ foreach my $query_set (@query_sets) {
   }
   else { $reads_filename = "  "; }
   
+  # This call gets ALL of the relevant data for this query set out of the database in a single,
+  # fast query, and stores it in a big data object thing.
+  # We can then access specific bits of it at will.
+  my $dbdata = $confuncs->get_all_queryset_data($query_set);
+  
   # A list of data types falling into classes along the read length
   # (Grouped together this way for convenient handling - they're all treated the same)
   my @per_position_value_types = (
@@ -344,46 +349,34 @@ foreach my $query_set (@query_sets) {
   foreach my $valtype (@per_position_value_types) {
     print "Querying $valtype\n";
     
-    my $qry = $reports->get_per_position_values($valtype, \%query_properties);
-    my $dat = $qry->to_csv;
-    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
-    print "@$column_headers\n";
+    my @vtdata = $confuncs->aggregate_data($dbdata, $valtype);
+    # @vtdata contains 6 array references, which can be used as columns in a results table, in
+    # the following order: column headers, position, size, mean, count and sum.
+    # It can be flipped round from column-separated to row-separated data for ease of printing:
+    my $rotdata = $confuncs->rotate_query_results(@vtdata);
     
-    if (@$returned_values >= 1) {
-      foreach my $rv (@$returned_values) {
-        $rv =~ s/,/\t/g;
-        
-        # Do something about the large number of decimal places. 3 ought to be plenty.
-        my @dat = split /\t/, $rv;
-        foreach my $val (@dat) {
-          unless ($val =~ /[[:alpha:]]/) {
-            if ($val != int $val) {
-              $val = sprintf '%.3f', $val;
-            }
-          }
-        }
-        
-        # Store the base interval of this particular record
-        # Give as an interval, if possible.
-        my $basepos = $dat[0];
+    if (@$rotdata >= 1) {
+      # Print this data to stdout - it makes the output of this script machine-readable.
+      foreach my $line (@$rotdata) { print "$line\n"; }
+      print "\n-----\n";
+      
+      # This data should also be organised into a data structure to facilitate later analyses
+      # and plotting. The base positions and intervals should be stored, and the actual data
+      # should be made easily and rationally accessible.
+      # As well as simple base numbers, give intervals (i.e., partitions) in the format 'x-y'.
+      foreach my $basepos (@{$vtdata[1]}) {
         my $interval_name = $basepos;
-        if ($base_intervals[-1]) {
-          if ($base_intervals[-1] < ($basepos - 1)) {
-            $interval_name = ($base_intervals[-1] + 1)."-$basepos";
+        if ($base_intervals [-1]) {
+          if ($base_intervals [-1] < ($basepos - 1)) {
+            $interval_name = ($base_intervals [-1] + 1)."-$basepos";
           }
         }
         push @interval_names, $interval_name;
         push @base_intervals, $basepos;
-        
-        # Store the actual data in a hash of arrays, according to type
-        # (It's pretty easy to retrieve later)
-        # Column 3 holds the data.
-        push @{$qualdata{$valtype}}, $dat[2];
-        
-        my $pout = join "\t", @dat;
-        print "$pout\n";
       }
-      print "\n-----\n";
+      
+      # That's the base positions and interval names. Now store the actual data.
+      @{$qualdata{$valtype}} = @{$vtdata[3]};
     }
     else {
       print "No values found in database\n";
@@ -407,45 +400,26 @@ foreach my $query_set (@query_sets) {
   foreach my $valtype (@other_value_types) {
     print "Querying $valtype\n";
     
-    my $qry = $reports->get_per_position_values($valtype, \%query_properties);
-    my $dat = $qry->to_csv;
-    my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
-    print "@$column_headers\n";
+    my @vtdata = $confuncs->aggregate_data($dbdata, $valtype);
+    # @vtdata contains 6 array references, which can be used as columns in a results table, in
+    # the following order: column headers, position, size, mean, count and sum.
+    # It can be flipped round from column-separated to row-separated data for ease of printing:
+    my $rotdata = $confuncs->rotate_query_results(@vtdata);
     
-    # X axis values for these plots are single figures, rather than
-    # intervals. That means no other manipulation is necessary.
-    my @xvals = ();
-    
-    if (@$returned_values >= 1) {
-      foreach my $rv (@$returned_values) {
-        $rv =~ s/,/\t/g;
-        
-        # Do something about the large number of decimal places. 3 ought to be plenty.
-        my @dat = split /\t/, $rv;
-        foreach my $val (@dat) {
-          unless ($val =~ /[[:alpha:]]/) {
-            if ($val != int $val) {
-              $val = sprintf '%.3f', $val;
-            }
-          }
-        }
-        
-        # Store the base interval of this particular record
-        # Give as an interval, if possible.
-        my $xval = $dat [0];
-        push @xvals, $xval;
-        
-        # Store the actual data in a hash of arrays, according to type
-        # (It's pretty easy to retrieve later)
-        # Column 3 holds the data.
-        push @{$qualdata{$valtype}}, $dat [2];
-        
-        my $pout = join "\t", @dat;
-        print "$pout\n";
-      }
-      
-      @{$independent_interval_names{$valtype}} = @xvals;
+    if (@$rotdata >= 1) {
+      # Print this data to stdout - it makes the output of this script machine-readable.
+      foreach my $line (@$rotdata) { print "$line\n"; }
       print "\n-----\n";
+      
+      # This data should also be organised into a data structure to facilitate later analyses
+      # and plotting. The base positions and intervals should be stored, and the actual data
+      # should be made easily and rationally accessible.
+      # Unlike earlier data, these data may have their own independent scales, which need to be
+      # recorded separately.
+      @{$independent_interval_names{$valtype}} = @{$vtdata[1]};
+      
+      # That's the scales. Now store the actual data.
+      @{$qualdata{$valtype}} = @{$vtdata[3]};
     }
     else {
       print "No values found in database\n";

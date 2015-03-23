@@ -352,7 +352,7 @@ sub check_for_duplicated_data {
   my $in = shift;
   my $reports = $self->{reports};
   
-  my $qry = $reports->list_subdivisions($in);
+  my $qry = $reports->detect_duplicates($in);
   my $avg = $qry->to_csv;
   my @returned_values = split /\n/, $avg;
   
@@ -1254,12 +1254,255 @@ sub latex_to_pdf {
 
 
 
-# The following subs prepare queries that are useful in general operations overviews
+# The following subs prepare queries that are useful in consumers and operations overviews.
+# In other words, they are useful for actually retrieving data from the database.
+
+sub get_all_queryset_data {
+  # I've discovered that it's far quicker to retrieve as much data as possible with a small number of
+  # carefully optimised but broad-scope queries, than to submit hundreds of similar, narrow-scope queries.
+  # There are still 3 major divisions within that data, though (per-analysis, per-position and per-partition)
+  # and there are distinct queries to deal with each.
+  # This is a convenience function that calls all 3 of those queries and parses their data into a single
+  # hash structure.
+  # Takes the standard consumer input parameter structure as an input.
+  my $self = shift;
+  my $inputs = shift;
+  my $reports = $self->{reports};
+  
+  my $queryset_data = ();
+  
+  # Get values that have only a single instance across an analysis object
+  my $qry = $reports->per_analysis_values_for_run($inputs);
+  my $avg = $qry->to_csv;
+  my @returned_values = split /\n/, $avg;
+  shift @returned_values;
+  
+  foreach my $line (@returned_values) {
+    chomp $line;
+    my @vals = split /,/, $line;
+    # Be aware that some of these values, particularly $barcode, may be null...
+    foreach my $i (1..9) {
+      if (!$vals[$i-1]) { $vals[$i-1] = '0.000'; }
+    }
+    
+    my ($value,$value_type,$instrument,$run,$lane,$read,$sample_name,$barcode,$tool) = @vals;
+    
+    # Arrange the data into the best structure.
+    # If it proves necessary I'll make sample_name substitutable for barcode, because it reflects
+    # the real situation well.
+    $queryset_data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type} = $value;
+    #$queryset_data->{$instrument}{$run}{$lane}{$read}{$barcode}{$tool}{$value_type} = $value;
+  }
+  
+  # Get values that describe single discrete points along an interval for an analysis object
+  $qry = $reports->per_position_values_for_run($inputs);
+  $avg = $qry->to_csv;
+  @returned_values = split /\n/, $avg;
+  shift @returned_values;
+  
+  foreach my $line (@returned_values) {
+    chomp $line;
+    my @vals = split /,/, $line;
+    # Be aware that some of these values, particularly $barcode, may be null/NA...
+    foreach my $i (1..10) {
+      if (!$vals[$i-1]) { $vals[$i-1] = '0.000'; }
+    }
+    
+    my ($position,$value,$value_type,$instrument,$run,$lane,$read,$sample_name,$barcode,$tool) = @vals;
+    
+    # Arrange the data into the best structure.
+    # If it proves necessary I'll make sample_name substitutable for barcode, because it reflects
+    # the real situation well.
+    $queryset_data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$position}{value} = $value;
+    #$queryset_data->{$instrument}{$run}{$lane}{$read}{$barcode}{$tool}{$value_type}{$position} = $value;
+  }
+  
+  # Get values that describe a contiguous range of points along an interval for an analysis object
+  $qry = $reports->per_partition_values_for_run($inputs);
+  $avg = $qry->to_csv;
+  @returned_values = split /\n/, $avg;
+  shift @returned_values;
+  
+  foreach my $line (@returned_values) {
+    chomp $line;
+    my @vals = split /,/, $line;
+    # Be aware that some of these values, particularly $barcode, may be null...
+    foreach my $i (1..10) {
+      if (!$vals[$i-1]) { $vals[$i-1] = '0.000'; }
+    }
+    
+    my ($partition,$partition_size,$value,$value_type,$instrument,$run,$lane,$read,$sample_name,$barcode,$tool) = @vals;
+    
+    # Arrange the data into the best structure.
+    # If it proves necessary I'll make sample_name substitutable for barcode, because it reflects
+    # the real situation well.
+    $queryset_data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$partition}{value} = $value;
+    $queryset_data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$partition}{size} = $partition_size;
+    #$queryset_data->{$instrument}{$run}{$lane}{$read}{$barcode}{$tool}{$value_type}{$partition}{value} = $value;
+    #$queryset_data->{$instrument}{$run}{$lane}{$read}{$barcode}{$tool}{$value_type}{$partition}{size} = $partition_size;
+  }
+  
+  return $queryset_data;
+}
+
+sub aggregate_data {
+  # This sub does two things at once:
+  # It retrieves all the data of a specified type from the data object set up in get_all_queryset_data.
+  # It also aggregates that data into a single set of averaged/summed figures according to the data type.
+  my $self = shift;
+  my $data = shift;
+  my $value_type = shift;
+  
+  unless ($value_type) {
+    die "ERROR: value_type not set in data aggregation function\n";
+  }
+  
+  my %agg_data = ();
+  my %agg_size = ();
+  foreach my $instrument (keys %{$data}) {
+    foreach my $run (keys %{$data->{$instrument}}) {
+      foreach my $lane (keys %{$data->{$instrument}{$run}}) {
+        foreach my $read (keys %{$data->{$instrument}{$run}{$lane}}) {
+          foreach my $sample_name (keys %{$data->{$instrument}{$run}{$lane}{$read}}) {
+            foreach my $tool (keys %{$data->{$instrument}{$run}{$lane}{$read}{$sample_name}}) {
+              # OK, that navigates us down to the level of a single record (or set of records).
+              # We only need to do anything if the matching value type is present here.
+              if ($data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}) {
+                # If the matching data type is found, 3 courses of action are available.
+                # 1. If $data{...}{$value_type} is a single value, push it into @agg_data.
+                #    It's an analysis value, and a simple mean/sum will be returned.
+                # 2. If $data{...}{$value_type} is an array value and a partition size is not present,
+                #    it's a position value and we'll set up an array of arrays to get mean/sum for
+                #    each position.
+                # 3. If If $data{...}{$value_type} is an array value and a partition size is present,
+                #    it's a partition value and we'll set up an array of arrays for mean/sum per
+                #    partition, and also store the sizes of the partitions in a similar array.
+                
+                if ($data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}) {
+                  # Possibilities 2 and 3 lead here
+                  my @positions = keys %{$data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}};
+                  
+                  if (ref($data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$positions[0]}{size})) {
+                    # Possibility 3 (partition values) leads here
+                    # We can tell because they have a 'size' field attached as well as a 'value' field.
+                    foreach my $partition (@positions) {
+                      my $value = $data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$partition}{value};
+                      my $size = $data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$partition}{size};
+                      push @{$agg_data{$partition}}, $value;
+                      push @{$agg_size{$partition}}, $size;
+                    }
+                  }
+                  else {
+                    # Possibility 2 (position values) leads here
+                    foreach my $position (@positions) {
+                      my $value = $data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type}{$position}{value};
+                      push @{$agg_data{$position}}, $value;
+                    }
+                  }
+                }
+                else {
+                  # Possibility 1 (analysis values) leads here
+                  push @{$agg_data{$value_type}}, $data->{$instrument}{$run}{$lane}{$read}{$sample_name}{$tool}{$value_type};
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  
+  # That's the data rearranged; now it's a matter of getting either an overall average (in the case of
+  # analysis_value data) or a per-position/partition average, and returning it all in a consistent format.
+  # I also round sum and mean to3 decimal places here.
+  if ($agg_data{$value_type}) {
+    # If data is found in here, there is only one list of numbers to be averaged/summed.
+    my $sum = $self->sum($agg_data{$value_type});
+    my $mean = $self->mean($agg_data{$value_type});
+    $sum = $self->round_to_x_places($sum, 3);
+    $mean = $self->round_to_x_places($mean, 3);
+    my $count = @{$agg_data{$value_type}};
+    
+    my @headers = ('AVERAGE','SAMPLES','TOTAL');
+    return (\@headers,$mean,$count,$sum);
+  }
+  else {
+    my @positions = sort {$a <=> $b} keys %agg_data;
+    my @sums = (); my @means = ();
+    my @size_means = ();
+    my @counts = ();
+    
+    foreach my $position (@positions) {
+      my $sum = $self->sum($agg_data{$position});
+      my $mean = $self->mean($agg_data{$position});
+      $sum = $self->round_to_x_places($sum, 3);
+      $mean = $self->round_to_x_places($mean, 3);
+      my $count = @{$agg_data{$position}};
+      push @sums, $sum;
+      push @means, $mean;
+      push @counts, $count;
+      
+      if ($agg_size{$position}) {
+        my $size_mean = $self->mean($agg_size{$position});
+        push @size_means, $size_mean;
+      }
+      else { push @size_means, 1; }
+    }
+    
+    my @headers = ('POSITION','SIZE','AVERAGE','SAMPLES','TOTAL');
+    return (\@headers,\@positions,\@size_means,\@means,\@counts,\@sums);
+  }
+}
+
+sub rotate_query_results {
+  # The results returned from aggregate_data are organised into columns.
+  # This organises them by row, making it easier to print this stuff to stdout etc.
+  # It's assumed that column references are supplied in the correct order.
+  my $self = shift;
+  my $headers = shift;
+  my @columns = @_;
+  
+  my @lines = ();
+  my $headstring = join ' ', @$headers;
+  push @lines, $headstring;
+  
+  foreach my $line_num (1..@{$columns[0]}) {
+    my @line = ();
+    foreach my $column (@columns) {
+      push @line, $column->[$line_num - 1];
+    }
+    my $line = join "\t", @line;
+    push @lines, $line;
+  }
+  return \@lines;
+}
 
 
+sub sum {
+  my $self = shift;
+  my $in = shift;
+  my $total = 0;
+  foreach my $i (@$in) {
+    $total += $i;
+  }
+  return $total;
+}
 
-
-
-
+sub mean {
+  my $self = shift;
+  my $in = shift;
+  
+  if (!$in) {
+    return 0;
+  }
+  my @data = @$in;
+  if (@data == 0) {
+    return 0;
+  }
+  
+  my $total = $self->sum(\@data);
+  my $mean = $total / @data;
+  return $mean;
+}
 
 1;
