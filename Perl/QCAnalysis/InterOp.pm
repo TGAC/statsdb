@@ -274,11 +274,75 @@ sub read_ids_and_lengths {
 }
 
 sub get_run_id {
-  # When passed the run directory, this returns the run ID.
-  # Works only on UNIX-style directories at the moment.
+  # When passed the run directory, this returns the run ID by reading it from RunInfo.xml.
   my $rundir = shift;
-  my @dirs = split /\//, $rundir;
-  return $dirs [-1];
+  
+  my $runinfo = parse_runinfo($rundir);
+  my $runID = $runinfo->{Run}{ID};
+  return $runID;
+}
+
+sub parse_runinfo {
+  # Run directory, by default, contains RunInfo.xml, which contains information on
+  # the cycles that make up each read in a run, the number of lanes, the run ID and
+  # flowcell ID, and a couple of other things that don't concern us here.
+  # We particularly want the cycle numbers for each read.
+		#$VAR1 = {
+        #  'xmlns:xsi' => 'http://www.w3.org/2001/XMLSchema-instance',
+        #  'Version' => '2',
+        #  'Run' => {
+        #           'Id' => '140306_SN790_0320_BC3UE1ACXX',
+        #           'Flowcell' => 'C3UE1ACXX',
+        #           'Instrument' => 'SN790',
+        #           'FlowcellLayout' => {
+        #                               'LaneCount' => '8',
+        #                               'SurfaceCount' => '2',
+        #                               'SwathCount' => '3',
+        #                               'TileCount' => '16'
+        #                             },
+        #           'Date' => '140306',
+        #           'Reads' => {
+        #                      'Read' => [
+        #                                {
+        #                                  'Number' => '1',
+        #                                  'IsIndexedRead' => 'N',
+        #                                  'NumCycles' => '101'
+        #                                },
+        #                                {
+        #                                  'Number' => '2',
+        #                                  'IsIndexedRead' => 'Y',
+        #                                  'NumCycles' => '7'
+        #                                },
+        #                                {
+        #                                  'Number' => '3',
+        #                                  'IsIndexedRead' => 'N',
+        #                                  'NumCycles' => '101'
+        #                                }
+        #                              ]
+        #                    },
+        #           'Number' => '320',
+        #           'AlignToPhiX' => {
+        #                            'Lane' => [
+        #                                      '1',
+        #                                      '2',
+        #                                      '3',
+        #                                      '4',
+        #                                      '5',
+        #                                      '6',
+        #                                      '7',
+        #                                      '8'
+        #                                    ]
+        #                          }
+        #         },
+        #  'xmlns:xsd' => 'http://www.w3.org/2001/XMLSchema'
+        #};
+
+  
+  my $run_dir = $_[0];
+  my $xml = new XML::Simple;
+  my $runinfo = $xml->XMLin("$run_dir/RunInfo.xml");
+  
+  return $runinfo
 }
 
 sub read_file {
@@ -1048,8 +1112,7 @@ sub data_into_object {
   if ($data_type) { $series_name = $series_name."_".$data_type; }
   
   # If there is an array reference in $relevant_data, then treat as per-position data
-  # If there is a single value, treat it as per-partition data, with the partition
-  # extending across the whole read.
+  # If there is a single value, treat it as per-analysis data.
   # If there is nothing (which may be the case when dealing with quartile/median/etc
   # data) return a warning message.
   if (ref($relevant_data) eq 'ARRAY') {
@@ -1066,16 +1129,9 @@ sub data_into_object {
 	}
   }
   elsif (($relevant_data) || ($relevant_data == 0)) {
-	# Add the partition
-	# Sort out the range of the partition; it should be supplied as a string in the form
-	# '1-100'
-	# (note single-quotes - I think Perl tries to be clever and treats that like a
-	# subtraction if it's double-quoted).
-	# Partition can also be added if the value of the data is 0. It's a legit value.
-	# That condition should be fine because adding partitions means we're using only
-	# numbers.
-	$analysis->add_valid_type($series_name, "base_partition");
-	$analysis->add_partition_value($read_ends{$read}{start}.'-'.$read_ends{$read}{end}, $series_name, $relevant_data);
+	# Store these as general (analysis) values.
+	$analysis->add_valid_type($series_name, "analysis");
+	$analysis->add_general_value($series_name.'_result', $relevant_data);
   }
   else {
 	# The following conditions can simply be quietly ignored, since they are expected to

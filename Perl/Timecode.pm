@@ -407,12 +407,6 @@ sub parse_runinfo {
   my $run_dir = $_[0];
   my $xml = new XML::Simple;
   my $runinfo = $xml->XMLin("$run_dir/RunInfo.xml");
-  #print Dumper($runinfo);
-#  my $rs = $runinfo->{Run}{Reads}{Read}[0]{NumCycles};
-#  my $reads = $runinfo->{Run}{Reads}{Read};
-#  foreach my $i (1..@$reads) {
-#	print "READ $i\n";
-#  }
   
   return $runinfo
 }
