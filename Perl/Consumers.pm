@@ -14,7 +14,7 @@ use strict;
 my %short_flags = (
   'help'            => 'h',
   'db_config'       => 'd',
-  'miso_config'     => 'm',
+  #'miso_config'     => 'm',
   'analysis'        => 'a',
   'instrument'      => 'i',
   'run'             => 'r',
@@ -39,7 +39,7 @@ my %long_flags = reverse %short_flags;
 my %help_strings = (
   'help'            => 'Display this message',
   'db_config'       => 'Database connection specification file (required)',
-  'miso_config'     => 'MISO API connection specification file (required)',
+  #'miso_config'     => 'MISO API connection specification file (required)',
   'analysis'        => 'Numeric ID of a single analysis record',
   'instrument'      => 'Instrument name',
   'run'             => 'Run ID',
@@ -106,7 +106,7 @@ sub deal_with_inputs {
   $args->getoptions(
     'h|help'            => \$vals{help},
     'd|db_config=s'     => \$vals{db_config},
-    'm|miso_config=s'   => \$vals{miso_config},
+    #'m|miso_config=s'   => \$vals{miso_config},
     'a|analysis:i'      => \$vals{analysis},
     'i|instrument:s'    => \$vals{instrument},
     'r|run:s'           => \$vals{run},
@@ -131,9 +131,9 @@ sub deal_with_inputs {
   $opts{db_config} = 1;
   $opts{help}      = 1;
   # If the MISO config file is in the opts lists, it should be required.
-  if (/miso_config/ ~~ @$opts) {
-    $opts{miso_config} = 1;
-  }
+  #if (/miso_config/ ~~ @$opts) {
+  #  $opts{miso_config} = 1;
+  #}
   
   # Deal with errors for missing mandatory inputs here
   # Check both for empty inputs and for files that don't actually exist.
@@ -151,18 +151,18 @@ sub deal_with_inputs {
     }
   }
   
-  if ($opts{miso_config}) {
-    if (!$vals{miso_config}) {
-      $vals{help} = 1;
-      print colored ['bright_white on_red'], "\n::WARNING::";
-      print colored ['reset'], "\tinput flag --miso_config MUST be set!\n\n";
-    }
-    elsif (!-f $vals{miso_config}) {
-      $vals{help} = 1;
-      print colored ['bright_white on_red'], "\n::WARNING::";
-      print colored ['reset'], "\tCannot find file\n\t\t  ".$vals{miso_config}."\n\t\tspecified via input flag --miso_config!\n\n";
-    }
-  }
+  #if ($opts{miso_config}) {
+  #  if (!$vals{miso_config}) {
+  #    $vals{help} = 1;
+  #    print colored ['bright_white on_red'], "\n::WARNING::";
+  #    print colored ['reset'], "\tinput flag --miso_config MUST be set!\n\n";
+  #  }
+  #  elsif (!-f $vals{miso_config}) {
+  #    $vals{help} = 1;
+  #    print colored ['bright_white on_red'], "\n::WARNING::";
+  #    print colored ['reset'], "\tCannot find file\n\t\t  ".$vals{miso_config}."\n\t\tspecified via input flag --miso_config!\n\n";
+  #  }
+  #}
   
   # Do some simple error-checking
   # Check that the passed query scope, if any, is one of the available

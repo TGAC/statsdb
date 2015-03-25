@@ -15,6 +15,9 @@ Constructor method. This constuctor doesn't actually establishes the connection.
 
 #my $self = ();
 
+# Modifying this class to make user access a bit easier. MISO access parameters are now included in the
+# same config file that database access is. Supply the same file to MISO and it will read those parameters
+# in. 
 sub new {
   my $class = shift;
   my $config_file = shift;

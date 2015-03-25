@@ -29,7 +29,7 @@ my @opts = (
   'begin',
   'end',
   'datetype',
-  'miso_config',
+  #'miso_config',
 );
 
 # Check the flags supplied match those just specified
@@ -600,7 +600,7 @@ LINE: foreach my $line (@timedata) {
 @timedata2 = ();
 
 # Get all runs from MISO
-my $miso = QCAnalysis::MISO->new($input_values->{MISO_CONFIG});
+my $miso = QCAnalysis::MISO->new($input_values->{DB_CONFIG});
 my $allrunsdata = $miso->get_run_info();
 
 # $allrunsdata is a big array of hashes - each hash holding details of a single run.
