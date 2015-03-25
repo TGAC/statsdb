@@ -170,6 +170,7 @@ sub get_average_values() {
 }
 
 sub get_per_position_values() {
+  # Query the database for data of a single value-type for the corresponding run parameters
   my $self = shift;
   my $analysis = shift;
   my $pref = shift;
@@ -195,6 +196,85 @@ sub get_per_position_values() {
 
   return Reports::ReportTable->new($sth);
 }
+
+sub per_analysis_values_for_run() {
+  # Query the database for data from all per-analysis data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL analysis_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub per_position_values_for_run() {
+  # Query the database for data from all per-position data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL position_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub per_partition_values_for_run() {
+  # Query the database for data from all per-partition data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL partition_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
 
 sub get_summary_values_with_comments() {
   # Get summary values with additional information stored as linked comments
