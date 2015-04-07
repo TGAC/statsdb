@@ -21,7 +21,7 @@ my @pairs;
 
 # Key is InterOp readID, value is the value that should go in the DB.
 my %database_pairids = ();
-my $run_directory;
+my $sequencer_directory;
 my @InterOp_files;
 my @bases = ('N', 'A', 'C', 'G', 'T');
 my %read_ends = ();
@@ -43,8 +43,8 @@ my %read_ends = ();
 
 sub parse_directory {
   my $class = shift;
-  $run_directory = shift;
-  $run_directory =~ s/\/$//g;
+  $sequencer_directory = shift;
+  $sequencer_directory =~ s/\/$//g;
   my $analysis = shift;
   
   # You can think of this sub as a kind of wrapper for parse_file.
@@ -52,13 +52,13 @@ sub parse_directory {
   # parse_file. The result is a set of objects primed for insertion into the database, exactly
   # as if a consumer had been given a list of files from statsdb_string.txt.
   
-  opendir(INTEROP, "$run_directory/InterOp/") or die "Cannot find InterOp directory in run directory $run_directory\n";
+  opendir(INTEROP, "$sequencer_directory/InterOp/") or die "Cannot find InterOp directory in run directory $sequencer_directory\n";
   @InterOp_files = grep {/MetricsOut.bin/} readdir INTEROP;
   closedir INTEROP;
   
   my @analyses = ();
   foreach my $file (@InterOp_files) {
-	my $thisfile_analyses = parse_file ("$run_directory/InterOp/$file", $analysis);
+	my $thisfile_analyses = parse_file ("$sequencer_directory/InterOp/$file", $analysis);
 	
 	foreach my $thisfile_analysis (@$thisfile_analyses) {
 	  push @analyses, $thisfile_analysis;
@@ -88,9 +88,9 @@ sub parse_file {
   $data = ();
   
   # Get the run directory if not yet supplied
-  if (!$run_directory) {
-	$run_directory = $file;
-	$run_directory =~ s/\/InterOp\/[a-zA-Z0-9]+.bin$//g;
+  if (!$sequencer_directory) {
+	$sequencer_directory = $file;
+	$sequencer_directory =~ s/\/InterOp\/[a-zA-Z0-9]+.bin$//g;
   }
   
   # The filename supplied will most likely be a full path.
@@ -99,23 +99,23 @@ sub parse_file {
   $file = $split[-1];
   
   # Check that the file exists.
-  unless (-e "$run_directory/InterOp/$file") {
+  unless (-e "$sequencer_directory/InterOp/$file") {
 	return "WARN: file\n $file\ninaccessible or does not exist";
   }
   
   # Get basic run information (RunInfo.xml)
-  RunInfo($run_directory);
+  RunInfo($sequencer_directory);
   # If this is inaccessible, then we cannot go any further. Return an error.
   unless ($data->{info}) {
 	return "WARN: basic run parameters (number of lanes, read length etc) unavailable";
   }
   
   # Read the relevant SAV file into memory
-  read_file($file, $run_directory); 
+  read_file($file, $sequencer_directory); 
   
   # Figure out number of lanes, since each lane needs its own set
   # of records. (Each lane is a different analysis).
-  my $number_of_lanes = NumLanes($run_directory);
+  my $number_of_lanes = NumLanes($sequencer_directory);
   
   # Figure out the read IDs, where each read starts and ends, etc.
   # InterOp files contain data for index reads as well as sequence reads.
@@ -127,9 +127,9 @@ sub parse_file {
   # Add some generic properties to the $analysis object
   # This need only be the most basic stuff (run ID) since other
   # analysis properties are already filled in by FastQC
-  my $run = get_run_id($run_directory);
+  my $run = get_run_id($sequencer_directory);
   $generic_analysis->add_property("run", $run);
-  $generic_analysis->add_property("interop_folder", $run_directory."/InterOp");
+  $generic_analysis->add_property("interop_folder", $sequencer_directory."/InterOp");
   $generic_analysis->add_property("tool", "InterOp");
   
   # InterOp data is contained within a set of files rather than a single file, and each of
@@ -165,12 +165,12 @@ sub parse_file {
 	  print "--lane $lane, pair $database_pairids{$pair}\n";
 	  
 	  # Start and end times of a particular read can also now be added
-	  $single_analysis->add_date('read_start',Timecode::read_start($run_directory,$pair));
-	  $single_analysis->add_date('read_end',Timecode::read_end($run_directory,$pair));
+	  $single_analysis->add_date('read_start',Timecode::read_start($sequencer_directory,$pair));
+	  $single_analysis->add_date('read_end',Timecode::read_end($sequencer_directory,$pair));
 	  
 	  parse_data($file, $single_analysis);
 	  
-	  #my $single_analysis = prepare_analysis_object($run_directory, $file, $lane, $pair, $generic_analysis);
+	  #my $single_analysis = prepare_analysis_object($sequencer_directory, $file, $lane, $pair, $generic_analysis);
 	  
 	  # Now that I've extracted and sorted out the data for this
 	  # analysis, I should change its read identifier to the human-readable version
@@ -195,7 +195,7 @@ sub parse_file {
 
 # ATTEMPTING TO BYPASS THIS
 #sub prepare_analysis_object {
-#  my $run_directory = shift;
+#  my $sequencer_directory = shift;
 #  my $file = shift;
 #  my $lane = shift;
 #  my $pair = shift;

@@ -29,7 +29,6 @@ my $line;
 my $module;
 my $status;
 my $config = $arguments{db_config};
-my $miso_config = $arguments{miso_config};
 
 my $db = QCAnalysis::DB->new();
 
@@ -83,9 +82,17 @@ ANALYSIS: foreach(@analysis) {
 		
 	    }
 	    elsif (/^MISO$/) {
-		my $miso = QCAnalysis::MISO->new($miso_config);
-		$miso->add_miso_data($analysis);
-		$db->insert_analysis($analysis);
+		my $miso = QCAnalysis::MISO->new($config);
+		if (ref($miso)) {
+		    $miso->add_miso_data($analysis);
+		    $db->insert_analysis($analysis);
+		}
+		else {
+		    # If the MISO constructor doesn't return a reference, it has failed to establish
+		    # a connection. Throw a warning (supplied in $miso).
+		    print "$miso\n\n";
+		}
+		
 	    }
 	    else {
 		print "WARN: Unknown analysis type [$analysis_type]\n";

@@ -21,15 +21,23 @@ Constructor method. This constuctor doesn't actually establishes the connection.
 sub new {
   my $class = shift;
   my $config_file = shift;
-
+  
   my $self = {"miso_string" => undef,
               "miso_user" => undef,
               "miso_api_key" => undef};
-
+  
   bless $self, $class;
   $self->parse_details($config_file);
-
-  return $self;
+  
+  # Test the connection. If successful, return object; if not, return warning.
+  my $test = $self->get_run_info();
+  if (ref($test)) {
+    return $self;
+  }
+  else {
+    return "WARN: Unable to establish connection to MISO with supplied config paraneters";
+  }
+  
 }
 
 sub parse_details(){
@@ -250,7 +258,6 @@ sub get_project_info {
 sub get_run_info {
   # Takes a MISO pool ID number
   # Returns a hash of various pool data (converted from JSON)
-  # EXCEEDS MAXIMUM NESTING LEVEL
   my $self = shift;
   my $library = shift;
   

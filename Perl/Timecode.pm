@@ -236,7 +236,7 @@ sub get_dates {
   my $analysis = shift;
   
   # Run directory is stored as a property. Get it.
-  my $run_dir = $analysis->get_property("run_folder");
+  my $run_dir = $analysis->get_property("sequencer_folder");
   my $analysis_type = $analysis->get_property("analysis_type");
   my $noindex_readnum = $analysis->get_property("pair");
   
@@ -312,7 +312,7 @@ sub fastqc_readid_to_on_machine {
   my $analysis = shift;
   
   # Run directory is stored as a property. Get it.
-  my $run_dir = $analysis->get_property("run_folder");
+  my $run_dir = $analysis->get_property("sequencer_folder");
   
   my $analysis_type = $analysis->get_property("analysis_type");
   my $fastqc_readnum = $analysis->get_property("pair");

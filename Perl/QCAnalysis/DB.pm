@@ -104,8 +104,14 @@ sub insert_properties() {
     my $id = $analysis->{id};
     my $properties = $analysis->{property};
     my $success=1;
-    foreach my $key ( keys %{$properties} ) {
+    KEY: foreach my $key ( keys %{$properties} ) {
 	#print "key: $key, value: " .."\n";
+	# Do not insert properties containing the sequencer directory of the run, since this is
+	# subject to change and does not belong in the database.
+	if (lc($key) eq 'sequencer_folder') {
+	    next KEY;
+	}
+	
 	my $value = $properties->{$key};
 	my $statement = "INSERT INTO analysis_property(analysis_id, property, value) VALUES ('$id', '$key', '$value');";
 	#print $statement."\n";
