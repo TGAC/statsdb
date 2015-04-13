@@ -361,59 +361,157 @@ sub check_for_duplicated_data {
   }
 }
 
-# Set up query sets
-# Given input values, return a list of distinct, defined sets of parameters
-# that can be passed to an SQL select statement to retrieve desired data. 
+# The following functions are for setting up query sets.
 
-sub prepare_query_sets {
+# Clean up results returned from the list_subdivisions stored procedure; remove columns,
+# reduce dimensionality (remove ruplicates)
+sub clean_query_sets {
   my $self = shift;
-  my $input_values = shift;
-  my $reports = $self->{reports};
+  # Inputs: column header and data from parse_query_results, column to remove,
+  # Outputs: same, edited.
+  my $column_headers = shift;
+  my $returned_values = shift;
+  my $columns_to_remove = shift;
   
-  if (!$input_values->{QSCOPE}) { $input_values->{QSCOPE} = 'na'; }
-  
-  my @query_sets = ();
-  if ($input_values->{QSCOPE} eq 'na') {
-    my %qry = %$input_values;
-    push @query_sets, \%qry;
+  unless (ref($columns_to_remove) eq 'ARRAY'){
+    die "ERROR: list of columns to remove in function clean_query_sets (Consumers.pm) must be an array reference\n"
   }
-  else {
-    print "Preparing query sets\n";
-    my $qry = $reports->list_subdivisions($input_values);
-    my $avg = $qry->to_csv;
-    my ($column_headers,$returned_values) = $self->parse_query_results(\$avg);
-    print "@$column_headers\n";
-    
-    # Make returned column headers upper-case so they match the hash keys used
-    # in the API
-    foreach my $k (@$column_headers) {
-      $k = uc $k;
+  
+  foreach my $col_tr (@$columns_to_remove) {
+    unless (uc $col_tr ~~ @$column_headers) {
+      print "WARN: column $col_tr not found in results\n";
     }
     
-    my $n = 0;
-    foreach my $query_set (@$returned_values) {
-      $n ++;
-      my %qry = ();
-      for my $i (1..@$column_headers) {
-        $i --;
-        my $val = $query_set->[$i];
-        my $key = $column_headers->[$i];
-        if ($val) { $qry {$key} = $val; }
+    # Get the index number ($i) of the column we're about to remove
+    my $i = 0; 
+    HEAD: foreach my $head (@$column_headers) {
+      if (uc $col_tr eq $head) {
+        last HEAD;
       }
-      
-      # Check that if sample names are represented, barcodes are too
-      # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
-      if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
-        my $bc = $self->get_barcode_for_sample($qry{SAMPLE_NAME});
-        $qry{BARCODE} = $bc;
+      $i++;
+    }
+    
+    # Remove the column using splice
+    @$column_headers = splice @$column_headers,$i,1;
+    foreach my $line (@$returned_values) {
+      @$line = splice @$line,$i,1;
+    }
+  }
+  
+  # Remove duplicate lines to complete the cleanup process
+  # Since $returned _values is an array of arrays, the lines have to be joined into strings first,
+  # then split up again afterwards. 
+  my @textlines = ();
+  foreach my $line (@$returned_values) {
+    push @textlines, (join ',', @$line);
+  }
+  @textlines = $self->remove_duplicates(\@textlines);
+  $returned_values = ();
+  foreach my $line (@textlines) {
+    my @line = split /,/, $line;
+    push @$returned_values, \@line;
+  }
+  
+  return ($column_headers,$returned_values);
+}
+
+# Remove read 0 lines.
+sub remove_read0_lines {
+  my $self = shift;
+  # Inputs: column header and data from parse_query_results, column to remove,
+  # Outputs: same, edited.
+  my $column_headers = shift;
+  my $returned_values = shift;
+  
+  # Get the index number ($i) of the read column
+  my $i = 0; 
+  HEAD: foreach my $head (@$column_headers) {
+    if ($head eq 'PAIR') {
+      last HEAD;
+    }
+    $i++;
+  }
+  
+  my $returned_values_no_read0_lines = ();
+  foreach my $line (@$returned_values) {
+    if ($line->[$i]) {
+      if ($line->[$i] > 0) {
+        push @$returned_values_no_read0_lines, $line;
       }
-      
-      push @query_sets, \%qry;
-      
-      print "QUERY $n:\n";
-      foreach my $key (keys %qry) {
-        print "\t$key:\t".$qry{$key}."\n";
+    }
+  }
+  
+  return ($column_headers,$returned_values_no_read0_lines);
+}
+
+# Remove index reads.
+sub remove_index_reads {
+  my $self = shift;
+  # Inputs: column header and data from parse_query_results, column to remove,
+  # Outputs: same, edited.
+  my $column_headers = shift;
+  my $returned_values = shift;
+  
+  # Get the index number ($i) of the read column
+  my $i = 0; 
+  HEAD: foreach my $head (@$column_headers) {
+    if ($head eq 'PAIR') {
+      last HEAD;
+    }
+    $i++;
+  }
+  
+  my $returned_values_no_indexread_lines = ();
+  foreach my $line (@$returned_values) {
+    if ($line->[$i]) {
+      if ($line->[$i] !~ /index/i) {
+        push @$returned_values_no_indexread_lines, $line;
       }
+    }
+  }
+  
+  return ($column_headers,$returned_values_no_indexread_lines);
+}
+
+# When given a set of results returned from the list_subdivisions stored procedure (possibly edited by
+# clean_query_sets and others, above), this organises the results into the hash data structure that other
+# parts of the API use.
+sub prepare_query_sets {
+  my $self = shift;
+  # Inputs: column header and data from parse_query_results, column to remove,
+  # Outputs: same, edited.
+  my $column_headers = shift;
+  my $returned_values = shift;
+  
+  # Make returned column headers upper-case so they match the hash keys used
+  # in the API
+  foreach my $k (@$column_headers) {
+    $k = uc $k;
+  }
+  
+  my $n = 0;  my @query_sets = ();
+  foreach my $query_set (@$returned_values) {
+    $n ++;
+    my %qry = ();
+    for my $i (1..@$column_headers) {
+      $i --;
+      my $val = $query_set->[$i];
+      my $key = $column_headers->[$i];
+      if ($val) { $qry {$key} = $val; }
+    }
+    
+    # Check that if sample names are represented, barcodes are too
+    # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
+    if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
+      my $bc = $self->get_barcode_for_sample($qry{SAMPLE_NAME});
+      $qry{BARCODE} = $bc;
+    }
+    
+    push @query_sets, \%qry;
+    
+    print "QUERY $n:\n";
+    foreach my $key (keys %qry) {
+      print "\t$key:\t".$qry{$key}."\n";
     }
   }
   
@@ -502,7 +600,7 @@ sub parse_query_results {
   my $in_ref = shift;
   
   chomp $$in_ref;
-  my @returned_values = split /\s/, $$in_ref;
+  my @returned_values = split /\s|\n/, $$in_ref;
   
   # The first line of this table is always the column headers
   my $column_headers = shift @returned_values;
@@ -654,13 +752,6 @@ sub remove_duplicates {
   
   return @out;
 }
-
-
-
-
-
-
-
 
 
 

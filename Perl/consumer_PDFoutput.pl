@@ -107,61 +107,33 @@ if ($duplicates) {
 # I made a sub in the API called list_subdivisions to do just that.
 
 # Store queries as hash references.
-my @query_sets = ();
+my $query_sets = ();
 if ($input_values->{QSCOPE} eq 'na') {
   my %qry = $input_values;
-  push @query_sets, \%qry;
+  push @$query_sets, \%qry;
 }
 else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions($input_values);
   my $avg = $qry->to_csv;
-  my @returned_values = split /\s/, $avg;
-  my $colheads = shift @returned_values;
-  my @column_headers = split /,/, $colheads;
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
   
-  print "@column_headers\n";
+  # The query sets returned by that function are not quite what we need here.
+  # They are separated at the level of analysis tool used to produce the data (e.g., FastQC); this is helpful
+  # for clearing up many otherwise confusing potential conflicts, but in this consumer we want a separation
+  # at the levels of instrument/run/lane/pair/barcode/sample name, NOT tool.
+  # This function cleans that up by removing the tool dimension from consideration here (and also cleans
+  # up some other irrelevant things, such as query sets for incorrect read numbers and index reads).
+  ($column_headers,$returned_values) = $confuncs->remove_read0_lines($column_headers,$returned_values);
+  ($column_headers,$returned_values) = $confuncs->remove_index_reads($column_headers,$returned_values);
+  my @columns_to_remove = ('tool');
+  ($column_headers,$returned_values) = $confuncs->clean_query_sets($column_headers,$returned_values,\@columns_to_remove);
   
-  # Make returned column headers upper-case so they match the hash keys used
-  # in the API
-  foreach my $k (@column_headers) {
-    $k = uc $k;
-  }
-  
-  my $n = 0;
-  foreach my $query_set (@returned_values) {
-    $n ++;
-    my @qry_vals = split /,/, $query_set;
-    my @keys = @column_headers;
-    my %qry = ();
-    while (@qry_vals) {
-      my $val = shift @qry_vals;
-      my $key = shift @keys;
-      $qry {$key} = $val;
-    }
-    
-    # Check that if sample names are represented, barcodes are too
-    # (Should be dealt with by list_subdivisions, but it never hurts to double-check)
-    if (($qry{SAMPLE_NAME}) && (!$qry{BARCODE})) {
-      my $bc = $confuncs->get_barcode_for_sample ($qry{SAMPLE_NAME});
-      $qry{BARCODE} = $bc;
-    }
-    
-    push @query_sets, \%qry;
-    
-    print "QUERY $n:\n";
-    foreach my $key (keys %qry) {
-      if ($qry{$key}) {
-        print "\t$key:\t".$qry{$key}."\n";
-      }
-      else {
-        print "\t$key:\tNone specified\n";
-      }
-    }
-  }
+  # Then, feed the remaining data into prepare_query_sets to generate the appropriate hash structure.
+  $query_sets = $confuncs->prepare_query_sets($column_headers,$returned_values);
 }
 
-print "Set up ".@query_sets." query set(s)\n\n";
+print "Set up ".@$query_sets." query set(s)\n\n";
 
 # Open TeX-format output, print stuff to start the file off
 open(TEX, '>', 'query_report.tex') or die "Unable to open LaTeX output file\n";
@@ -219,7 +191,7 @@ $texcode{"summary_table"} =
 # Query sets now established. Cycle each one, produce output graphs for each,
 # and append relevant stuff to a LaTeX output file. 
 my $qnum = 0;
-foreach my $query_set (@query_sets) {
+foreach my $query_set (@$query_sets) {
   my %query_properties = %$query_set;
   $qnum ++;
   
@@ -408,7 +380,9 @@ foreach my $query_set (@query_sets) {
     
     if (@$rotdata >= 1) {
       # Print this data to stdout - it makes the output of this script machine-readable.
-      foreach my $line (@$rotdata) { print "$line\n"; }
+      foreach my $line (@$rotdata) { $line =~ s/\t/,/g; }
+      print $confuncs->make_printable_table(join "\n", @$rotdata);
+      
       print "\n-----\n";
       
       # This data should also be organised into a data structure to facilitate later analyses

@@ -35,9 +35,8 @@ sub new {
     return $self;
   }
   else {
-    return "WARN: Unable to establish connection to MISO with supplied config paraneters";
+    return "WARN: Unable to establish connection to MISO with supplied config parameters";
   }
-  
 }
 
 sub parse_details(){
