@@ -392,9 +392,9 @@ sub clean_query_sets {
     }
     
     # Remove the column using splice
-    @$column_headers = splice @$column_headers,$i,1;
+    splice @$column_headers,$i,1;
     foreach my $line (@$returned_values) {
-      @$line = splice @$line,$i,1;
+      splice @$line,$i,1;
     }
   }
   
@@ -511,7 +511,9 @@ sub prepare_query_sets {
     
     print "QUERY $n:\n";
     foreach my $key (keys %qry) {
-      print "\t$key:\t".$qry{$key}."\n";
+      if ($qry{$key}) {
+        print "\t$key:\t".$qry{$key}."\n";
+      }
     }
   }
   
@@ -597,22 +599,30 @@ sub parse_query_results {
   # first, the column headers;
   # second, an array of values per row, split on comma (since csv). 
   my $self = shift;
-  my $in_ref = shift;
+  my $in = shift;
   
-  chomp $$in_ref;
-  my @returned_values = split /\s|\n/, $$in_ref;
-  
-  # The first line of this table is always the column headers
-  my $column_headers = shift @returned_values;
-  my @col_heads = split /,/,$column_headers;
-  
-  my @results = ();
-  foreach my $rv (@returned_values) {
-    my @dat = split /,/, $rv;
-    push @results, \@dat;
+  # Input can be either a CSV string, or an array reference, or (potentially) an
+  # array of arrays. Two checks handle that appropriately. 
+  my @returned_values = ();
+  if (ref $in) {
+    foreach my $line (@$in) {
+      if (ref $line) { push @returned_values, $line; }
+      else {
+        my @sp = split /,/, $line;
+        push @returned_values, \@sp;
+      }
+    }
+  }
+  else {
+    chomp $in;
+    my @sp = split /\s|\n/, $in;
+    # Recursive call to this func, supplying it with an array reference
+    my ($col_heads,$results) = $self->parse_query_results(\@sp);
+    return ($col_heads,$results);
   }
   
-  return (\@col_heads, \@results);
+  my $col_heads = shift @returned_values;
+  return ($col_heads, \@returned_values);
 }
 
 sub make_printable_table {
@@ -632,7 +642,7 @@ sub make_printable_table {
     $returned_values = $input2;
   }
   else {
-    ($column_headers,$returned_values) = $self->parse_query_results(\$input1);
+    ($column_headers,$returned_values) = $self->parse_query_results($input1);
   }
   
   # Get max character length for each column (counting headers too)
@@ -780,7 +790,6 @@ sub call_rscript {
     foreach my $arg (@$args) { $argv[0] .= " $arg"; }
   }
   elsif ($args) { print "ERROR: option \$args should be an array reference when calling R script $func\n"; }
-  
   #my $Rout = system(@argv) == 0 or die "ERROR: Unable to launch $func R script\n";
   my $Rout = `$argv[0]` or die "ERROR: Unable to launch $func R script\n";
   
@@ -892,7 +901,7 @@ sub sequence_content_plot {
   
   # Set output filenames
   my $datafile = "seq_content_q$qnum.df";
-  my $plotfile = "seq_content_plot_q$qnum.pdf";
+  my $plotfile = "sequence_content_plot_q$qnum.pdf";
   my $rscript = "sequence_content_across_reads";
   
   open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
@@ -1018,9 +1027,9 @@ sub length_distribution_plot {
   my $qnum = shift;           # Unique identifier of current query set
   
   # Set output filenames
-  my $datafile = "gc_dist_q$qnum.df";
-  my $plotfile = "gc_dist_plot_q$qnum.pdf";
-  my $rscript = "gc_distribution";
+  my $datafile = "length_dist_q$qnum.df";
+  my $plotfile = "length_dist_plot_q$qnum.pdf";
+  my $rscript = "length_distribution";
   
   open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
   print DAT "Xval\tLengthDist";
@@ -1554,7 +1563,7 @@ sub rotate_query_results {
   my @columns = @_;
   
   my @lines = ();
-  my $headstring = join ' ', @$headers;
+  my $headstring = join "\t", @$headers;
   push @lines, $headstring;
   
   foreach my $line_num (1..@{$columns[0]}) {

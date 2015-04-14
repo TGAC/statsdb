@@ -1,7 +1,8 @@
 args <- commandArgs(trailingOnly = TRUE)
-qnum <- args[0]
+qnum <- args[1]
 
-qualdata <- read.delim("length_dist.df", header = TRUE, as.is = TRUE)
+dataName <- paste("length_dist_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 xvals = seq(from = 1, to = nrow(qualdata), by = 1)
 
 plotName <- paste("length_dist_plot_q", qnum, ".pdf", sep="")

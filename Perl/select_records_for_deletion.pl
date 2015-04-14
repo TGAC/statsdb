@@ -102,7 +102,7 @@ unless ($check =~ /Delete these records/) {
 # Get analysis IDs of selected records
 $qry = $reports->get_analysis_id($input_values);
 $avg = $qry->to_csv;
-my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+my ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
 
 foreach my $line (@$returned_values) {
   my $analysis_id = $line->[0];

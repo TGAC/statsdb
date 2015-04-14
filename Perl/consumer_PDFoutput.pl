@@ -116,7 +116,7 @@ else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions($input_values);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   
   # The query sets returned by that function are not quite what we need here.
   # They are separated at the level of analysis tool used to produce the data (e.g., FastQC); this is helpful
@@ -207,16 +207,15 @@ foreach my $query_set (@$query_sets) {
   # Those come from passing the relevant data to get_average_values
   my $qry = $reports->get_average_values(\%query_properties);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   
   # Rows: min seq length, total seqs, gc content, filtered seqs, max seq length,
   # total duplicate read percentage
   # Set up summary data hash to store this (and other) properties of this query set
   my %summarydata = ();
   foreach my $row (@$returned_values) {
-    my @dat = split /,/, $row;
-    my $desc = $dat [0];
-    my $val  = $dat [1];
+    my $desc = $row->[0];
+    my $val  = $row->[1];
     $summarydata {$desc} = $val;
   }
   
@@ -236,7 +235,7 @@ foreach my $query_set (@$query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   
   print "Querying analysis properties\nPROPERTY,VALUE\n";
   foreach my $line (@$returned_values) {
@@ -328,8 +327,9 @@ foreach my $query_set (@$query_sets) {
     my $rotdata = $confuncs->rotate_query_results(@vtdata);
     
     if (@$rotdata >= 1) {
-      # Print this data to stdout - it makes the output of this script machine-readable.
-      foreach my $line (@$rotdata) { print "$line\n"; }
+      # Print this data to stdout - it makes the output of this script readable.
+      foreach my $line (@$rotdata) { $line =~ s/\t/,/g; }
+      print $confuncs->make_printable_table($rotdata);
       print "\n-----\n";
       
       # This data should also be organised into a data structure to facilitate later analyses
@@ -379,10 +379,9 @@ foreach my $query_set (@$query_sets) {
     my $rotdata = $confuncs->rotate_query_results(@vtdata);
     
     if (@$rotdata >= 1) {
-      # Print this data to stdout - it makes the output of this script machine-readable.
+      # Print this data to stdout - it makes the output of this script readable.
       foreach my $line (@$rotdata) { $line =~ s/\t/,/g; }
-      print $confuncs->make_printable_table(join "\n", @$rotdata);
-      
+      print $confuncs->make_printable_table($rotdata);
       print "\n-----\n";
       
       # This data should also be organised into a data structure to facilitate later analyses
@@ -404,7 +403,7 @@ foreach my $query_set (@$query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
+  ($column_headers,$returned_values) = $confuncs->parse_query_results($dat);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
   foreach my $ors (@$returned_values) {
@@ -428,6 +427,9 @@ foreach my $query_set (@$query_sets) {
   }
   
   print "\n-----\n";
+  
+  # One more thing: general high-level summary values, using 
+  
   
   # Now that the data is available, some plots can be produced simply
   # by writing appropriate data to a file and calling the associated

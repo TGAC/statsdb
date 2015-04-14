@@ -1,7 +1,8 @@
 args <- commandArgs(trailingOnly = TRUE)
-qnum <- args[0]
+qnum <- args[1]
 
-qualdata <- read.delim("seq_dupe.df", header = TRUE, as.is = TRUE)
+dataName <- paste("seq_dupe_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 xvals = seq(from = 1, to = nrow(qualdata), by = 1)
 percentvals = seq (from = 0, to = 100, by = 10)
 

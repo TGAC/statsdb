@@ -113,7 +113,7 @@ else {
   print "Preparing query sets\n";
   my $qry = $reports->list_subdivisions($input_values);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   
   # The query sets returned by that function are not quite what we need here.
   # They are separated at the level of analysis tool used to produce the data (e.g., FastQC); this is helpful
@@ -151,7 +151,7 @@ foreach my $query_set (@$query_sets) {
   # Those come from passing the relevant data to get_average_values
   my $qry = $reports->get_average_values(\%query_properties);
   my $avg = $qry->to_csv;
-  my ($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  my ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   
   # Rows: min seq length, total seqs, gc content, filtered seqs, max seq length,
   # total duplicate read percentage
@@ -179,7 +179,7 @@ foreach my $query_set (@$query_sets) {
   # this way can be obtained using the SQL routine list_selectable_properties
   $qry = $reports->get_properties_for_analysis_ids(\@analysis_ids);
   $avg = $qry->to_csv;
-  #($column_headers,$returned_values) = $confuncs->parse_query_results(\$avg);
+  #($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
   ##@$returned_values = split /\n/, $avg;
   #
   #print "Querying analysis properties\nPROPERTY,VALUE\n";
@@ -363,7 +363,7 @@ foreach my $query_set (@$query_sets) {
   my %overrepresented_sequences = ();
   $qry = $reports->get_summary_values_with_comments('overrepresented_sequence', \%query_properties);
   my $dat = $qry->to_csv;
-  ($column_headers,$returned_values) = $confuncs->parse_query_results(\$dat);
+  ($column_headers,$returned_values) = $confuncs->parse_query_results($dat);
   
   print "Overrepresented sequences:\nSequence\tComment\n";
   foreach my $ors (@$returned_values) {

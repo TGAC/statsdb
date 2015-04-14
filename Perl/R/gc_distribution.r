@@ -1,7 +1,8 @@
 args <- commandArgs(trailingOnly = TRUE)
-qnum <- args[0]
+qnum <- args[1]
 
-qualdata <- read.delim("gc_dist.df", header = TRUE, as.is = TRUE)
+dataName <- paste("gc_dist_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 
 # For some unfathomable reason, R refuses to take the series of numbers in
 # qualdata$Xvals as a vector, so it must be tricked into doing so.

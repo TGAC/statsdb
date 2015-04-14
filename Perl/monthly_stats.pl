@@ -732,9 +732,9 @@ RUN: foreach my $run (@$allrunsdata) {
 print "\n";
 
 # Pack that data off to R to be plotted
-#my ($plot, $timedataFile) = $confuncs->machine_activity_plot($input_values,\@timedata);
+my ($plot, $timedataFile) = $confuncs->machine_activity_plot($input_values,\@timedata);
 # Commented out for now due to lack of lubridate.
-my $plot = "ops_plot.pdf";
+#my $plot = "ops_plot.pdf";
 
 #########
 # LaTeX #

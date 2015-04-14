@@ -2,9 +2,10 @@
 # horizontal.
 
 args <- commandArgs(trailingOnly = TRUE)
-qnum <- args[0]
+qnum <- args[1]
 
-qualdata <- read.delim("quality.df", header = TRUE, as.is = TRUE)
+dataName <- paste("quality_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 dat <- subset(qualdata, select = c('X90th.Percentile','Upper.Quartile','Median','Lower.Quartile','X10th.Percentile'))
 datmat <- t(data.matrix(dat))
 z <- list(stats = datmat, names = qualdata$Interval)
