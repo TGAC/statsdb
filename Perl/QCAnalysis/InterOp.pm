@@ -127,7 +127,9 @@ sub parse_file {
   # Add some generic properties to the $analysis object
   # This need only be the most basic stuff (run ID) since other
   # analysis properties are already filled in by FastQC
-  my $run = get_run_id($sequencer_directory);
+  #my $run = get_run_id($sequencer_directory);
+  
+  my $run = $data->{info}{runid};
   $generic_analysis->add_property("run", $run);
   $generic_analysis->add_property("interop_folder", $sequencer_directory."/InterOp");
   $generic_analysis->add_property("tool", "InterOp");
@@ -1131,7 +1133,7 @@ sub data_into_object {
   elsif (($relevant_data) || ($relevant_data == 0)) {
 	# Store these as general (analysis) values.
 	$analysis->add_valid_type($series_name, "analysis");
-	$analysis->add_general_value($series_name.'_result', $relevant_data);
+	$analysis->add_general_value($series_name, $relevant_data);
   }
   else {
 	# The following conditions can simply be quietly ignored, since they are expected to

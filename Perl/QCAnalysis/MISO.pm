@@ -16,22 +16,24 @@ Constructor method. This constuctor doesn't actually establishes the connection.
 #my $self = ();
 
 # Modifying this class to make user access a bit easier. MISO access parameters are now included in the
-# same config file that database access is. Supply the same file to MISO and it will read those parameters
-# in. 
+# same config file that database access is. Supply the QCAnalysis::DB object and we'll get the parameters
+# out of it.
 sub new {
   my $class = shift;
-  my $config_file = shift;
+  my $db_object = shift;
   
-  my $self = {"miso_string" => undef,
-              "miso_user" => undef,
-              "miso_api_key" => undef};
+  my $self = {"miso_string" => $db_object->{miso_string},
+              "miso_user" => $db_object->{miso_user},
+              "miso_api_key" => $db_object->{miso_api_key}};
   
   bless $self, $class;
-  $self->parse_details($config_file);
+  #$self->parse_details($config_file);
   
   # Test the connection. If successful, return object; if not, return warning.
   my $test = $self->get_run_info();
+  print "Testing connection\n";
   if (ref($test)) {
+    print "MISO connection established.\n";
     return $self;
   }
   else {
@@ -39,17 +41,17 @@ sub new {
   }
 }
 
-sub parse_details(){
-  my $self = shift;
-  my $config_file = shift;
-  my $config_fh = new IO::File( $config_file , "r" ) or die $!;
-  while(my $line = $config_fh->getline()){
-    chomp $line;
-    if($line =~ /(\S+)\s+(\S*)/){
-      $self->{$1} = $2;
-    }
-  }
-}
+#sub parse_details(){
+#  my $self = shift;
+#  my $config_file = shift;
+#  my $config_fh = new IO::File( $config_file , "r" ) or die $!;
+#  while(my $line = $config_fh->getline()){
+#    chomp $line;
+#    if($line =~ /(\S+)\s+(\S*)/){
+#      $self->{$1} = $2;
+#    }
+#  }
+#}
 
 # Making a call to the MISO API is a two-step process:
 # First, you submit the intended URL, with parameters via GET, to the
@@ -67,18 +69,19 @@ sub add_miso_data {
   my $self = shift;
   my $analysis = shift;
   
+  $analysis->add_property("tool", "MISO");
+  
   # Get relevant analysis parameters from object
   my $runID = $analysis->get_property("run");
   my $sampleID = $analysis->get_property("sample_name");
-  
   # Get sampleRef (see comments on that sub for explanation)
   my $sampleRef = $self->get_sample_ref($runID,$sampleID);
   
   # $sampleRef and $sampleID contain all the library (LIB), library
   # dilution (LDI) and project (PRO) numbers we need to get pretty
   # much everything we could ever want out of MISO.
-  my ($library,$library_dilution) = lib_ldi_from_sampleid($sampleID);
-  my ($project) = pro_from_sampleref($sampleRef);
+  my ($library,$library_dilution) = $self->lib_ldi_from_sampleid($sampleID);
+  my ($project) = $self->pro_from_sampleref($sampleRef);
   
   $self->parse_library_info($analysis, $library);
   $self->parse_project_info($analysis, $project);
@@ -111,7 +114,7 @@ sub parse_library_info {
   
   # Library QCs
   if ($data->{libraryQCs}) {
-    foreach my $qc (@$data->{libraryQCs}) {
+    foreach my $qc (@{$data->{libraryQCs}}) {
       my $name = $qc->{qcType}{name};
       my $result = $qc->{results};
       $analysis->add_valid_type($name.'_result',"analysis");
@@ -121,7 +124,7 @@ sub parse_library_info {
   
   # Sample QCs
   if ($data->{sample}{sampleQCs}) {
-    foreach my $qc (@$data->{sample}{sampleQCs}) {
+    foreach my $qc (@{$data->{sample}{sampleQCs}}) {
       my $name = $qc->{qcType}{name};
       my $result = $qc->{results};
       $analysis->add_valid_type($name.'_result',"analysis");
@@ -142,8 +145,8 @@ sub parse_project_info {
   my $data = $self->get_project_info($pro);
   
   # Add study type and description
-  $analysis->add_property("study_type", $data->{studies}{studyType});
-  $analysis->add_property("study_description", $data->{studies}{description});
+  $analysis->add_property("study_type", $data->{studies}[0]{studyType});
+  $analysis->add_property("study_description", $data->{studies}[0]{description});
   
   # Add more once the need becomes apparent
   
@@ -190,6 +193,8 @@ sub lib_ldi_from_sampleid {
   my @id = split /_/, $sampleID;
   my $lib = $id[1];
   my $ldi = $id[2];
+  $lib =~ s/[a-zA-Z]//g;
+  $ldi =~ s/[a-zA-Z]//g;
   return ($lib,$ldi);
 }
 
@@ -202,6 +207,7 @@ sub pro_from_sampleref {
   
   my @id = split /_/, $sampleRef;
   my $pro = $id[0];
+  $pro =~ s/[a-zA-Z]//g;
   return ($pro);
 }
 
@@ -287,6 +293,7 @@ sub get_signature {
   my $url = shift;
   
   my $command = 'echo -n "'.$url.'?x-url='.$url.'@x-user='.$self->{miso_user}.'" | openssl sha1 -binary -hmac "'.$self->{miso_api_key}.'" | openssl base64 | tr -d = | tr +/ -_';
+  print "SIG COMMAND:\n$command\n";
   my $sig = `$command`;
   chomp $sig;
   return $sig;
@@ -299,6 +306,7 @@ sub submit {
   
   # -sS flag hides normal progress bar but shows errors
   my $command = 'curl -sS --request GET "'.$self->{miso_string}.$url.'" --header "x-user:'.$self->{miso_user}.'" --header "x-signature:'.$sig.'" --header "x-url:'.$url.'"';
+  print "COMMAND:\n$command\n";
   my $data = `$command`;
   chomp $data;
   

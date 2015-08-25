@@ -1,6 +1,7 @@
 package QCAnalysis::DB;
 use DBI;
 use IO::File;
+use File::Basename;
 use strict;
 
 =head1 QCAnalysis::DB
@@ -48,7 +49,11 @@ sub new {
     my $self = {"connection" => undef , 
 		"db_user" => undef,
 		"db_password" => undef ,
-		"db_string" => undef };
+		"db_string" => undef,
+		"miso_string" => undef,
+		"miso_user" => undef,
+		"misoi_api_key" => undef,
+		"data_types_config_file" => undef};
     bless $self, $class;
     return $self;
 }
@@ -64,8 +69,56 @@ sub parse_details(){
 	    $self->{$1} = $2;
 	}
     }
+    $self->parse_valid_data_types();
 }
 
+# This seems a logical place to read in the config file that contains the list of valid data types. It can
+# be invoked as part of the connection process - by parse_details, perhaps.
+# That list will get attached to the object, so will be available whenever stuff gets inserted into the database.
+sub parse_valid_data_types {
+    my $self = shift;
+    my $config_file = $self->{data_types_config_file};
+    my $config_fh = new IO::File( $config_file , "r" ) or die $!;
+    while(my $line = $config_fh->getline()) {
+	chomp $line;
+	#print $line."\n";
+	if($line =~ /(\S+)\s(\S*)\s(\S*)/){
+	    $self->{data_types_config}{$1} = $3;
+	    push @{$self->{data_types_classification}{$2}}, $1;
+	}
+    }
+}
+
+# Due to that exclusivity of data, we are likely to run into cases where a whole analysis object may contain no
+# useful data. That can be pre-empted by identifying such cases from statsdb_string input, and skipping them.
+# This sub compares the expected data in a given file (as determined by the config file parsed above) to that
+# which is configured to be used, and determines whether to skip this analysis object or not.
+sub data_enabled_check {
+    my $self = shift;
+    my $type = lc shift;
+    my $path = shift;
+    my $file = basename($path);
+    
+    my $data_class = $type;
+    if ($type =~ /interop/i) {
+	my $interop_type = $file;
+	$interop_type =~ s/Out.bin//;
+	$data_class .= "_$interop_type";
+    }
+    
+    # Get list of data types associated with this class of data
+    my $data_types = $self->{data_types_classification}{$data_class};
+    
+    # Check that at least one data type in that list is switched on
+    my $on = 0;
+    foreach my $data_type (@$data_types) {
+	if ($self->{data_types_config}{$data_type} eq 'yes') {
+	    $on = 1;
+	}
+    }
+    
+    return $on;
+}
 
 =head3 $db->connect("config.txt")
 Method that establishes a connection to the database. To connect to the database, a configuration file is 
@@ -93,7 +146,7 @@ Method that closes the connection to the database.
 
 sub disconnect(){
     my $self = shift;
-    print "Dissconnecting\n";
+    print "Disconnecting\n";
     $self->{connection}->disconnect() or warn "Unable to disconnect $DBI::errstr\n";
 }
 
@@ -217,10 +270,15 @@ sub insert_values() {
     my $general_values = $analysis->get_general_values();
     while ((my $key, my $value) = each(%$general_values)) {
 	if(defined $id_values{$key}) {
-	    $id_value = $id_values{$key};
-	    my $ins_gv = "INSERT INTO analysis_value (analysis_id, value_type_id, value) VALUES ('".$analysis->{id}."', $id_value, $value);";
-	    #print $ins_gv."\n";
-	    $inserted &= $db->do($ins_gv);
+	    if ($self->{data_types_config}{$key}) {
+		if ($self->{data_types_config}{$key} eq 'yes') {
+		    $id_value = $id_values{$key};
+		    my $ins_gv = "INSERT INTO analysis_value (analysis_id, value_type_id, value) VALUES ('".$analysis->{id}."', $id_value, $value);";
+		    #print $ins_gv."\n";
+		    $inserted &= $db->do($ins_gv);
+		}
+	    }
+	    else { print "WARN: Value type \"$key\" not specified in data types config \n"; }
 	} else {
 	    unless(defined $warn_printed{$key}) {
 		print "WARN: Value not defined '".$key."'\n";
@@ -241,6 +299,7 @@ sub insert_partitions(){
     my %id_values;
     #	print $values."\n";
     my $id_value;
+    # $key here is the value type.
     while ((my $key, my $value) = each(%$values)) {
 	$id_values{$key} = $self->get_value_id($key, $value);
     }
@@ -249,13 +308,20 @@ sub insert_partitions(){
     my $analysis_id = $analysis->{id};
     foreach(@$partition_values) {
 	if($id_values{$_->[2]} > 0) {
-	    my $position = $_->[0];
-	    my $size = $_->[1];
-	    my $value_type_id = $id_values{$_->[2]};
-	    my $value =  $_->[3];
-	    my $ins_pv = "INSERT INTO per_partition_value (analysis_id, position, size, value, value_type_id) VALUES ($analysis_id, $position, $size, $value, $value_type_id);\n";
-	    #print $ins_pv;
-	    $inserted &= $db->do($ins_pv);
+	    # Value type = $_->[2]
+	    # Check that that is allowed by the data types config
+	    if ($self->{data_types_config}{$_->[2]}) {
+		if ($self->{data_types_config}{$_->[2]} eq 'yes') {
+		    my $position = $_->[0];
+		    my $size = $_->[1];
+		    my $value_type_id = $id_values{$_->[2]};
+		    my $value =  $_->[3];
+		    my $ins_pv = "INSERT INTO per_partition_value (analysis_id, position, size, value, value_type_id) VALUES ($analysis_id, $position, $size, $value, $value_type_id);\n";
+		    #print $ins_pv;
+		    $inserted &= $db->do($ins_pv);
+		}
+	    }
+	    else { print "WARN: Partition value not specified in data types config ".$_->[2]."\n"; }
 	} else {
 	    unless(defined $warn_printed{$_->[2]} ) {
 		print "WARN: Not defined ".$_->[2]."\n";
@@ -284,12 +350,19 @@ sub insert_positions() {
     my $analysis_id = $analysis->{id};
     foreach(@$position_values){
 	if($id_values{$_->[1]} > 0) {
-	    my $position = $_->[0];
-	    my $value_type_id = $id_values{$_->[1]};
-	    my $value =  $_->[2];
-	    my $ins_pv = "INSERT INTO per_position_value (analysis_id, position, value, value_type_id) VALUES ($analysis_id, $position, $value, $value_type_id);\n";
-    #	print $ins_pv;
-	    $inserted &= $db->do($ins_pv);
+	    # Value type = $_->[1]
+	    # Check that that is allowed by the data types config
+	    if ($self->{data_types_config}{$_->[1]}) {
+		if ($self->{data_types_config}{$_->[1]} eq 'yes') {
+		    my $position = $_->[0];
+		    my $value_type_id = $id_values{$_->[1]};
+		    my $value =  $_->[2];
+		    my $ins_pv = "INSERT INTO per_position_value (analysis_id, position, value, value_type_id) VALUES ($analysis_id, $position, $value, $value_type_id);\n";
+		    #print $ins_pv;
+		    $inserted &= $db->do($ins_pv);
+		}
+	    }
+	    else { print "WARN: Position value not specified in data types config ".$_->[1]."\n"; }
 	} else {
 	    unless(defined $warn_printed{$_->[1]}) {
 		print "WARN: Not defined ".$_->[1]."\n";

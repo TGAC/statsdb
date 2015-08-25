@@ -46,7 +46,18 @@ ANALYSIS: foreach(@analysis) {
     print "path : ".$analysis_path."\n";
     print "type : ".$analysis_type."\n";
     
-    # Get the various timestamps associated with this analysis
+    # Check that the current type of analysis hasn't been effectively disabled
+    # It may be that all of the data types associated with this type of analysis have been disabled in the
+    # data types config. If so, we cannot allow this analysis to be inserted, since it will contain no useful
+    # data, and will therefore cause nothing but confusion.
+    # We can figure this out from the path and the listed analysis type. The $db object has a function to do that.
+    my $skip = $db->data_enabled_check($analysis_type,$analysis_path);
+    unless ($skip eq 1) {
+	print "WARN: No data types for this analysis enabled in the data config file. Proceeding with next analysis.\n";
+	next ANALYSIS;
+    }
+    
+    # Get the various timestamps associated with this analysis.
     # Also checks if the run is complete!
     my $date_check = Timecode->get_dates($analysis);
     unless ($date_check eq 1) {
@@ -82,7 +93,7 @@ ANALYSIS: foreach(@analysis) {
 		
 	    }
 	    elsif (/^MISO$/) {
-		my $miso = QCAnalysis::MISO->new($config);
+		my $miso = QCAnalysis::MISO->new($db);
 		if (ref($miso)) {
 		    $miso->add_miso_data($analysis);
 		    $db->insert_analysis($analysis);
