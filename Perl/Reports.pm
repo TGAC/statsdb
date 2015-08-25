@@ -46,21 +46,28 @@ sub list_global_analyses() {
   return Reports::ReportTable->new($sth);
 }
 
-sub set_duplicate_selection_type() {
+sub set_duplicate_detection_type() {
   my $self = shift;
   my $pref = shift;
+  # IMPORTANT: This functionality works by setting a session variable in MySQL.
+  # Obviously, session variables don't persist once you disconnect; but all of the existing
+  # SQL functions in this module re-establish connection when they're called. We therefore
+  # have to call this once a session has been established (where appropriate). One of the
+  # inputs to this sub must also be the connection parameters of the session. Hence:
+  my $con = shift;
   
   my @args = (undef);
   $args[0] = $pref->{DUPLICATE_TYPE} if exists $pref->{DUPLICATE_TYPE};
   
-  my $statement = "CALL set_duplicate_selection_type(?)";
-  my $con = $self->get_connection();
-  my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
+  if ($args[0]) {
+    my $statement = "CALL set_duplicate_selection_type(?)";
+    my $sth = $con->prepare($statement) || die $con->errstr;
+    $sth->bind_param(1, $args[0]);
+    $sth->execute();
+  }
   
-  $sth->execute();
-
-  return Reports::ReportTable->new($sth);
+  # Don't return anything; this query doesn't.
+  #return Reports::ReportTable->new($sth);
 }
 
 sub detect_duplicates() {
@@ -81,13 +88,14 @@ sub detect_duplicates() {
   
   my $statement = "CALL detect_duplicates(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
   }
   
   $sth->execute();
-
+  
   return Reports::ReportTable->new($sth);
 }
 
@@ -159,6 +167,7 @@ sub get_average_values() {
   
   my $statement = "CALL general_summaries_for_run(?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..6) {
     $sth->bind_param($i, $args[$i-1]);
@@ -187,6 +196,7 @@ sub get_per_position_values() {
   
   my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..8) {
     $sth->bind_param($i, $args[$i-1]);
@@ -213,6 +223,7 @@ sub per_analysis_values_for_run() {
   
   my $statement = "CALL analysis_values_for_run(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
@@ -239,6 +250,7 @@ sub per_position_values_for_run() {
   
   my $statement = "CALL position_values_for_run(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
@@ -265,6 +277,7 @@ sub per_partition_values_for_run() {
   
   my $statement = "CALL partition_values_for_run(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
@@ -294,7 +307,7 @@ sub get_summary_values_with_comments() {
   
   my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
-  
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
@@ -323,6 +336,7 @@ sub get_summary_values() {
   
   my $statement = "CALL summary_value(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);
@@ -346,6 +360,7 @@ sub list_contaminants () {
   
   my $statement = "CALL list_contaminants(?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..3) {
     $sth->bind_param($i, $args[$i-1]);
@@ -371,6 +386,7 @@ sub contaminant_summary () {
   
   my $statement = "CALL contaminant_summary(?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..4) {
     $sth->bind_param($i, $args[$i-1]);
@@ -380,7 +396,6 @@ sub contaminant_summary () {
   
   return Reports::ReportTable->new($sth);
 }
-
 
 sub get_analysis_properties() {
   # Get a list of all the different properties that are available for all
@@ -521,6 +536,7 @@ sub get_library_type_for_run() {
   
   my $statement = "CALL get_lib_type_for_run(?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->bind_param(1, $args[0]);
   
@@ -586,7 +602,7 @@ sub list_subdivisions() {
   
   my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
-  
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..12) {
     $sth->bind_param($i, $args[$i-1]);
@@ -682,6 +698,7 @@ sub get_analysis_id() {
   my $statement = "CALL get_analysis_id(?,?,?,?,?,?,?)";
   
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
   foreach my $i (1..7) {
     $sth->bind_param($i, $args[$i-1]);

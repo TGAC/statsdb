@@ -104,23 +104,23 @@ sub deal_with_inputs {
   $vals{qscope} = 'na';
   
   $args->getoptions(
-    'h|help'            => \$vals{help},
-    'd|db_config=s'     => \$vals{db_config},
-    #'m|miso_config=s'   => \$vals{miso_config},
-    'a|analysis:i'      => \$vals{analysis},
-    'i|instrument:s'    => \$vals{instrument},
-    'r|run:s'           => \$vals{run},
-    'o|pseq:s'          => \$vals{pseq},
-    'l|lane:s'          => \$vals{lane},
-    'p|pair:i'          => \$vals{pair},
-    's|sample_name:s'   => \$vals{sample_name},
-    'b|barcode:s'       => \$vals{barcode},
-    'q|scope:s'         => \$vals{qscope},
-    'c|begin:s'         => \$vals{begin},
-    'e|end:s'           => \$vals{end},
-    't|datetype:s'      => \$vals{datetype},
-    'f|tool:s'          => \$vals{tool},
-    'v|duplicate_type'  => \$vals{duplicate_type},
+    'h|help'             => \$vals{help},
+    'd|db_config=s'      => \$vals{db_config},
+    #'m|miso_config=s'    => \$vals{miso_config},
+    'a|analysis:i'       => \$vals{analysis},
+    'i|instrument:s'     => \$vals{instrument},
+    'r|run:s'            => \$vals{run},
+    'o|pseq:s'           => \$vals{pseq},
+    'l|lane:s'           => \$vals{lane},
+    'p|pair:i'           => \$vals{pair},
+    's|sample_name:s'    => \$vals{sample_name},
+    'b|barcode:s'        => \$vals{barcode},
+    'q|scope:s'          => \$vals{qscope},
+    'c|begin:s'          => \$vals{begin},
+    'e|end:s'            => \$vals{end},
+    't|datetype:s'       => \$vals{datetype},
+    'f|tool:s'           => \$vals{tool},
+    'v|duplicate_type:s' => \$vals{duplicate_type},
   );
   
   # Set the supplied list of active options into a hash, for ease of
@@ -763,9 +763,113 @@ sub remove_duplicates {
   return @out;
 }
 
+# These subs set up a common data structure that more advanced output functions can make use of.
+# It's a similar idea to the input hashes, but it holds more stuff.
+sub add_to_data_stash {
+  # Pass it a table and a value type, and it'll read it into a memory structure, easy as that.
+  my $self = shift;
+  my $datastruct = shift;   # Reference to the data structure to add the query data to.
+  my $results = shift;      # Query results, either from parse_query_results or rotate_query_results_col_to_row
+  my $value_type = shift;   # Value type of the data, e.g. quality_mean
+  my $data_type = shift;    # Data to select from the query data - e.g., average, sum (i.e., pick a column)
+  
+  if (!$value_type) { die "ERROR: No value type supplied to data storage function\n"; }
+  
+  # If $results is an array ref, it means we have output from either parse_query_results or
+  # rotate_query_results_col_to_row. Those are both line-oriented structures, but we want them as
+  # a column-oriented structure here. Use rotate_query_results_row_to_col.
+  # Otherwise, the input is a single value that can be attached more directly.
+  if (ref $results) {
+    my $cols = $self->rotate_query_results_row_to_col($results);
+    
+    # Good - now we can get the columns we want and add them to the structure.
+    
+    # Get the position column (look through @{$cols->[0]} to find it)
+    my $i = 1;
+    FINDHEAD: foreach my $head (@{$cols->[0]}) {
+      if ($head =~ /position/i) { last FINDHEAD; }
+      $i ++;
+    }
+    
+    # There are actually two things we want to record here - the single base position (directly from the
+    # query), and the interval (the previous + 1 base to the base in the query's data).
+    foreach my $basepos (@{$cols->[1]}) {
+      my $interval_name = $basepos;  # This is so that if we have a single value where it doesn't make sense to store an
+                                     # interval, we still get the correct number of interval names, and a correct point value
+      if ($datastruct->{$value_type}{base_scale}[-1]) {
+        if ($datastruct->{$value_type}{base_scale}[-1] < ($basepos - 1)) {
+          $interval_name = ($datastruct->{$value_type}{base_scale}[-1] + 1)."-$basepos";
+        }
+      }
+      push @{$datastruct->{$value_type}{interval_names_scale}}, $interval_name;
+      push @{$datastruct->{$value_type}{base_scale}}, $basepos;
+    }
+    
+    # Get the column number corresponding to the value supplied in $data_type
+    $i = 1;
+    FINDCOL: foreach my $head (@{$cols->[0]}) {
+      if ($head =~ /$data_type/i) { last FINDCOL; }
+      $i ++;
+    }
+    
+    # Put that column in the right place
+    @{$datastruct->{$value_type}{data}} = @{$cols->[$i]};
+  }
+  else {
+    $datastruct->{$value_type} = $results;
+  }
+}
 
+# How about something to get data out of it too? It's easy enough that a few lines of code can handle it
+# anyway, but it might be more convenient to use this. 
+sub get_data_from_stash {
+  # A counterpart to add_data_to_stash - this retrieves the specified data from the structure
+  # that add_data_to_stash fills up, along with its scale values, and puts it in a standard form that
+  # the output functions can understand.
+  my $self = shift;
+  my $datastruct = shift;
+  my $value_type = shift;  # Ref to array of value types to pick out. 
+  
+  return $datastruct->{$value_type};
+}
 
-# The following subs all call R scripts to produce graphs.
+sub get_data_point_from_stash {
+  # Same as above, but aimed at getting a single data point rather than the whole array.
+  # Expects array index number rather than scale number, on the grounds that it will be called within
+  # a loop where scale points are being cycled through anyway.
+  my $self = shift;
+  my $datastruct = shift;
+  my $value_type = shift;  # Ref to array of value types to pick out.
+  my $index = shift;
+  
+  return $datastruct->{$value_type}{data}[$index];
+}
+
+sub check_scale_identity {
+  # This is meant to be called as an integral check on the data that gets fed to a more complex output
+  # function. In those cases, it may be that several different value types are called. It's possible
+  # that types with different scales may be accidentally mixed in together. This sub is used to detect
+  # that kind of situation, or to return a single scale if all is well.
+  my $self = shift;
+  my $qualdata = shift;   # Data structure ref
+  my $valtypes = shift;   # Arrayt of value types ref
+  my $scale_type = shift; # Scale type - single values (base_scale) or ranges (interval_names_scale)
+  
+  my @scales = ();
+  foreach my $value_type (@$valtypes) { push @scales, $qualdata->{$value_type}{$scale_type}; }
+  
+  my $first_scale = $scales[0];
+  foreach my $scale (@scales) {
+    unless (@$first_scale ~~ @$scale) {
+      print "ERROR: Mismatched scales for the following data series!\n";
+      foreach my $valtype (@$valtypes) { print "  $valtype"; }
+      die "\n";
+    }
+  }
+  return $first_scale;
+}
+
+# The following subs all call R scripts to produce graphs, or are related to that.
 
 sub call_rscript {
   # Calls an R script (name of script supplied as input) on supplied
@@ -774,7 +878,6 @@ sub call_rscript {
   # $args should be an array reference
   my $self = shift;
   my $func = shift;
-  my $data = shift;
   my $args = shift;
   
   # It would be better if I could pass the filename ($data) to R, rather
@@ -822,279 +925,374 @@ sub call_rscript {
   return ($plot);
 }
 
+sub write_data_to_file {
+  # Designed to handle writing an arbitrary set of data from the standard query data structure to a file.
+  # Useful because a lot of more advanced output functions, e.g. graphical outputs, require files written. 
+  my $self = shift;
+  my $qualdata = shift;
+  my $datafile = shift;
+  my $intervals = shift;
+  my $valtypes = shift;
+  my $colheads = shift; # Note that 'Intervals' will always be printed first anyway, so it can be omitted here.
+  
+  # For the purposes of writing a useful error message, get the name of the sub that called this:
+  my $calling_sub = (caller(1))[3];
+  open(DAT, '>', $datafile) or die "Cannot open data file\n  $datafile\nfor output function $calling_sub\n";
+  print DAT "Interval";
+  foreach my $head (@$colheads) { print DAT "\t$head"; }
+  
+  my $i = 0;
+  foreach my $interval (@$intervals) {
+    my @line = ($interval);
+    foreach my $value_type (@$valtypes) {
+      push @line, $self->get_data_point_from_stash($qualdata,$value_type,$i);
+    }
+    my $line = join "\t", @line;
+    print DAT "\n$line";
+    $i++;
+  }
+  close DAT;
+  # No need to return anything here
+}
+
 # All of these subs get data (from a reference to an object containing
 # all data extracted by querying the database as part of a consumer
 # script), write it out to a file, and call an R script to produce a
 # plot from that data. 
-sub read_quality_plot {
+sub freq_distribution_over_range_plot {
   my $self = shift;
-  my $interval_names = shift; # Position info for each data point
   my $qualdata = shift;       # Reference to data object
+  my $valtypes = shift;       # List of value types in data object to use here.
+                              # Expected order: top point, top of box, middle of box, bottom of box, bottom point, line point
+  my $plot_title = shift;
+  my $xlabel = shift;
+  my $ylabel = shift;
   my $qnum = shift;           # Unique identifier of current query set
   
+  if (!$qnum) { $qnum = 1; }
+  
   # Set output filenames
-  my $datafile = "quality_q$qnum.df";
-  my $plotfile = "quality_plot_q$qnum.pdf";
-  my $rscript = "read_quality_graph";
+  # These can be derived from the plot title, with all troublesome characters stripped out.
+  my $filename = $plot_title;
+  $filename =~ s/\s/_/g;
+  $filename =~ s/[^a-zA-Z0-9_]//g;
+  my $datafile = "$filename\_q$qnum.df";
+  my $plotfile = "$filename\_q$qnum.pdf";
+  #my $rscript = "read_quality_graph";
+  my $rscript = "freq_distribution_over_range_plot";
   
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Interval\t90th Percentile\tUpper Quartile\tMedian\tMean\tLower Quartile\t10th Percentile";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'quality_90th_percentile'}};
-    push @line, shift @{$qualdata->{'quality_upper_quartile'}};
-    push @line, shift @{$qualdata->{'quality_median'}};
-    push @line, shift @{$qualdata->{'quality_mean'}};
-    push @line, shift @{$qualdata->{'quality_lower_quartile'}};
-    push @line, shift @{$qualdata->{'quality_10th_percentile'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
+  # Check that the right number of value types have been supplied
+  my $required_types = 6;
+  my $this_sub = (caller(1))[3];
+  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+  # Check that all scales used in the supplied data types match
+  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+  # Make the column headers for the output file (which will be the series names in the plot)
+  my $colheads -> ('Max','Upper quartile','Median','LowerQuartile','Min','Mean');
   
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
+  # Write the data to the file we set a bit earlier
+  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
   
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
+  # Set up arguments and execute the R script!
+  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+  $self->call_rscript($rscript, \@args);
   return ($plotfile, $datafile);
 }
 
-sub quality_distribution_plot {
-  my $self = shift;
-  my $interval_names = shift; # Position info for each data point
-  my $qualdata = shift;       # Reference to data object
-  my $qnum = shift;           # Unique identifier of current query set
-  
-  # Set output filenames
-  my $datafile = "qual_dist_q$qnum.df";
-  my $plotfile = "qual_dist_plot_q$qnum.pdf";
-  my $rscript = "quality_distribution";
-  
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Xval\tQualDist";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'quality_score_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
-  
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
-  
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
-  return ($plotfile, $datafile);
-}
+
+# Looks like I don't need this - it's just a simple line plot, like several others.
+#sub freq_distribution_plot {
+#  my $self = shift;
+#  my $qualdata = shift;       # Reference to data object
+#  my $valtypes = shift;       # List of value types in data object to use here. (Only one here)
+#  my $plot_title = shift;
+#  my $xlabel = shift;
+#  my $ylabel = shift;
+#  my $qnum = shift;           # Unique identifier of current query set
+#  
+#  if (!$qnum) { $qnum = 1; }
+#  
+#  # Set output filenames
+#  # These can be derived from the plot title, with all troublesome characters stripped out.
+#  my $filename = $plot_title;
+#  $filename =~ s/\s/_/g;
+#  $filename =~ s/[^a-zA-Z0-9_]//g;
+#  my $datafile = "$filename\_q$qnum.df";
+#  my $plotfile = "$filename\_q$qnum.pdf";
+#  my $rscript = "quality_distribution";
+#  
+#  # Check that the right number of value types have been supplied
+#  my $required_types = 1;
+#  my $this_sub = (caller(1))[3];
+#  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+#  # Check that all scales used in the supplied data types match
+#  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+#  # Make the column headers for the output file (which will be the series names in the plot)
+#  my $colheads = ();
+#  foreach my $valtype (@$valtypes) {
+#    my $cleaned_up = ucfirst $valtype;
+#    $cleaned_up =~ s/_/ /g;
+#    push @$colheads, $cleaned_up;
+#  }
+#  
+#  # Write the data to the file we set a bit earlier
+#  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
+#  
+#  # Set up arguments and execute the R script!
+#  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+#  $self->call_rscript($rscript, \@args);
+#  return ($plotfile, $datafile);
+#}
 
 sub sequence_content_plot {
   my $self = shift;
-  my $interval_names = shift; # Position info for each data point
   my $qualdata = shift;       # Reference to data object
+  my $valtypes = shift;       # List of value types in data object to use here.
+                              # Expected order: A, C, G, T
+  my $plot_title = shift;
+  my $xlabel = shift;
+  my $ylabel = shift;
   my $qnum = shift;           # Unique identifier of current query set
   
+  if (!$qnum) { $qnum = 1; }
+  
   # Set output filenames
-  my $datafile = "seq_content_q$qnum.df";
-  my $plotfile = "sequence_content_plot_q$qnum.pdf";
+  # These can be derived from the plot title, with all troublesome characters stripped out.
+  my $filename = $plot_title;
+  $filename =~ s/\s/_/g;
+  $filename =~ s/[^a-zA-Z0-9_]//g;
+  my $datafile = "$filename\_q$qnum.df";
+  my $plotfile = "$filename\_q$qnum.pdf";
+  #my $rscript = "sequence_content_across_reads";
+  my $rscript = "sequence_content_plot";
+  
+  # Check that the right number of value types have been supplied
+  my $required_types = 4;
+  my $this_sub = (caller(1))[3];
+  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+  # Check that all scales used in the supplied data types match
+  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+  # Make the column headers for the output file (which will be the series names in the plot)
+  my $colheads = ();
+  foreach my $valtype (@$valtypes) {
+    my $cleaned_up = ucfirst $valtype;
+    $cleaned_up =~ s/_/ /g;
+    push @$colheads, $cleaned_up;
+  }
+  
+  # Write the data to the file we set a bit earlier
+  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
+  
+  # Set up arguments and execute the R script!
+  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+  $self->call_rscript($rscript, \@args);
+  return ($plotfile, $datafile);
+}
+
+sub single_line_plot {
+  my $self = shift;
+  my $qualdata = shift;       # Reference to data object
+  my $valtypes = shift;       # List of value types in data object to use here.
+                              # Expected order: A, C, G, T
+  my $plot_title = shift;
+  my $xlabel = shift;
+  my $ylabel = shift;
+  my $qnum = shift;           # Unique identifier of current query set
+  
+  if (!$qnum) { $qnum = 1; }
+  
+  # Set output filenames
+  # These can be derived from the plot title, with all troublesome characters stripped out.
+  my $filename = $plot_title;
+  $filename =~ s/\s/_/g;
+  $filename =~ s/[^a-zA-Z0-9_]//g;
+  my $datafile = "$filename\_q$qnum.df";
+  my $plotfile = "$filename\_q$qnum.pdf";
   my $rscript = "sequence_content_across_reads";
   
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Interval\tA\tC\tT\tG";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'base_content_a'}};
-    push @line, shift @{$qualdata->{'base_content_c'}};
-    push @line, shift @{$qualdata->{'base_content_t'}};
-    push @line, shift @{$qualdata->{'base_content_g'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
+  # Check that the right number of value types have been supplied
+  my $required_types = 1;
+  my $this_sub = (caller(1))[3];
+  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+  # Check that all scales used in the supplied data types match
+  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+  # Make the column headers for the output file (which will be the series names in the plot)
+  my $colheads = ();
+  foreach my $valtype (@$valtypes) {
+    my $cleaned_up = ucfirst $valtype;
+    $cleaned_up =~ s/_/ /g;
+    push @$colheads, $cleaned_up;
   }
-  close DAT;
   
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
+  # Write the data to the file we set a bit earlier
+  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
   
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
+  # Set up arguments and execute the R script!
+  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+  $self->call_rscript($rscript, \@args);
   return ($plotfile, $datafile);
 }
 
-sub gc_content_plot {
+sub normal_distribution_plot {
   my $self = shift;
-  my $interval_names = shift; # Position info for each data point
   my $qualdata = shift;       # Reference to data object
+  my $valtypes = shift;       # List of value types in data object to use here.
+                              # Expected order: A, C, G, T
+  my $plot_title = shift;
+  my $xlabel = shift;
+  my $ylabel = shift;
   my $qnum = shift;           # Unique identifier of current query set
   
-  # Set output filenames
-  my $datafile = "gc_content_q$qnum.df";
-  my $plotfile = "gc_content_plot_q$qnum.pdf";
-  my $rscript = "gc_content_across_reads";
-  
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Interval\tGC";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'gc_content_percentage'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
-  
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
-  
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
-  return ($plotfile, $datafile);
-}
-
-sub gc_distribution_plot {
-  my $self = shift;
-  my $interval_names = shift; # Position info for each data point
-  my $qualdata = shift;       # Reference to data object
-  my $qnum = shift;           # Unique identifier of current query set
+  if (!$qnum) { $qnum = 1; }
   
   # Set output filenames
-  my $datafile = "gc_dist_q$qnum.df";
-  my $plotfile = "gc_dist_plot_q$qnum.pdf";
+  # These can be derived from the plot title, with all troublesome characters stripped out.
+  my $filename = $plot_title;
+  $filename =~ s/\s/_/g;
+  $filename =~ s/[^a-zA-Z0-9_]//g;
+  my $datafile = "$filename\_q$qnum.df";
+  my $plotfile = "$filename\_q$qnum.pdf";
   my $rscript = "gc_distribution";
   
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Xval\tGCDist";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'gc_content_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
+  # Check that the right number of value types have been supplied
+  my $required_types = 1;
+  my $this_sub = (caller(1))[3];
+  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+  # Check that all scales used in the supplied data types match
+  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+  # Make the column headers for the output file (which will be the series names in the plot)
+  my $colheads = ();
+  foreach my $valtype (@$valtypes) {
+    my $cleaned_up = ucfirst $valtype;
+    $cleaned_up =~ s/_/ /g;
+    push @$colheads, $cleaned_up;
   }
-  close DAT;
   
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
+  # Write the data to the file we set a bit earlier
+  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
   
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
+  # Set up arguments and execute the R script!
+  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+  $self->call_rscript($rscript, \@args);
   return ($plotfile, $datafile);
 }
 
-sub n_content_plot {
-  my $self = shift;
-  my $interval_names = shift; # Position info for each data point
-  my $qualdata = shift;       # Reference to data object
-  my $qnum = shift;           # Unique identifier of current query set
-  
-  # Set output filenames
-  my $datafile = "n_content_q$qnum.df";
-  my $plotfile = "n_content_plot_q$qnum.pdf";
-  my $rscript = "n_content_across_reads";
-  
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Interval\tN";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'base_content_n_percentage'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
-  
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
-  
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
-  return ($plotfile, $datafile);
-}
+#sub n_content_plot {
+#  # MAY be able to replace this with a single line plot - see how it goes
+#  my $self = shift;
+#  my $interval_names = shift; # Position info for each data point
+#  my $qualdata = shift;       # Reference to data object
+#  my $qnum = shift;           # Unique identifier of current query set
+#  
+#  # Set output filenames
+#  my $datafile = "n_content_q$qnum.df";
+#  my $plotfile = "n_content_plot_q$qnum.pdf";
+#  my $rscript = "n_content_across_reads";
+#  
+#  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+#  print DAT "Interval\tN";
+#  foreach my $interval (@$interval_names) {
+#    my @line = ($interval);
+#    push @line, shift @{$qualdata->{'base_content_n_percentage'}};
+#    my $line = join "\t", @line;
+#    print DAT "\n$line";
+#  }
+#  close DAT;
+#  
+#  # Set up arguments and execute the R script!
+#  my @args = ($qnum);
+#  $self->call_rscript($rscript, \@args);
+#  return ($plotfile, $datafile);
+#}
 
-sub length_distribution_plot {
-  my $self = shift;
-  my $interval_names = shift; # Position info for each data point
-  my $qualdata = shift;       # Reference to data object
-  my $qnum = shift;           # Unique identifier of current query set
-  
-  # Set output filenames
-  my $datafile = "length_dist_q$qnum.df";
-  my $plotfile = "length_dist_plot_q$qnum.pdf";
-  my $rscript = "length_distribution";
-  
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Xval\tLengthDist";
-  
-  # In the case of Illumina reads, there will only be one entry here.
-  # Put one either side, in order to replicate the FastQC plot.
-  if (@$interval_names == 1) {
-    my $num = $interval_names->[0];
-    unshift @$interval_names, $num - 1;
-    unshift @{$qualdata->{'sequence_length_count'}}, '0.0';
-    push @$interval_names,    $num + 1;
-    push @{$qualdata->{'sequence_length_count'}}, '0.0';
-  }
-  
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'sequence_length_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
-  
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
-  
-  # And execute the R script!
-  $self->call_rscript($rscript, $datafile, \@args);
-  
-  return ($plotfile, $datafile);
-}
+#sub length_distribution_plot {
+#  # Reluctant to do this just yet - looks like I might have to pad some missing data.
+#  # I'm going to add a function elsewhere to add leading/following padding, then feed this to the single line plotter.
+#  my $self = shift;
+#  my $interval_names = shift; # Position info for each data point
+#  my $qualdata = shift;       # Reference to data object
+#  my $qnum = shift;           # Unique identifier of current query set
+#  
+#  # Set output filenames
+#  my $datafile = "length_dist_q$qnum.df";
+#  my $plotfile = "length_dist_plot_q$qnum.pdf";
+#  my $rscript = "length_distribution";
+#  
+#  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
+#  print DAT "Xval\tLengthDist";
+#  
+#  # In the case of Illumina reads, there will only be one entry here.
+#  # Put one either side, in order to replicate the FastQC plot.
+#  if (@$interval_names == 1) {
+#    my $num = $interval_names->[0];
+#    unshift @$interval_names, $num - 1;
+#    unshift @{$qualdata->{'sequence_length_count'}}, '0.0';
+#    push @$interval_names,    $num + 1;
+#    push @{$qualdata->{'sequence_length_count'}}, '0.0';
+#  }
+#  
+#  foreach my $interval (@$interval_names) {
+#    my @line = ($interval);
+#    push @line, shift @{$qualdata->{'sequence_length_count'}};
+#    my $line = join "\t", @line;
+#    print DAT "\n$line";
+#  }
+#  close DAT;
+#  
+#  # Set up arguments and execute the R script!
+#  my @args = ($qnum);
+#  $self->call_rscript($rscript, \@args);
+#  return ($plotfile, $datafile);
+#}
 
-sub sequence_duplication_plot {
-  my $self = shift;
-  my $interval_names = shift; # Position info for each data point
-  my $qualdata = shift;       # Reference to data object
-  my $qnum = shift;           # Unique identifier of current query set
-  
-  # Set output filenames
-  my $datafile = "seq_dupe_q$qnum.df";
-  #my $plotfile = "seq_dupe_plot_q$qnum.pdf";
-  my $rscript = "sequence_duplication";
-  
-  open(DAT, '>', $datafile) or die "Cannot open quality data file $datafile for R input\n";
-  print DAT "Xval\tSequenceDuplication";
-  foreach my $interval (@$interval_names) {
-    my @line = ($interval);
-    push @line, shift @{$qualdata->{'duplication_level_relative_count'}};
-    my $line = join "\t", @line;
-    print DAT "\n$line";
-  }
-  close DAT;
-  
-  # Set up arguments
-  # $qnum will be one arg
-  my @args = ($qnum);
-  
-  # And execute the R script!
-  my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
-  
-  return ($plotfile, $datafile);
-}
+#sub sequence_duplication_plot {
+#  # MAY be able to replace this with a single line plot - see how it goes
+#  my $self = shift;
+#  my $qualdata = shift;       # Reference to data object
+#  my $valtypes = shift;       # List of value types in data object to use here.
+#                              # Expected order: A, C, G, T
+#  my $qnum = shift;           # Unique identifier of current query set
+#  my $plot_title = shift;
+#  my $xlabel = shift;
+#  my $ylabel = shift;
+#  
+#  # Set output filenames
+#  # These can be derived from the plot title, with all troublesome characters stripped out.
+#  my $filename = $plot_title;
+#  $filename =~ s/\s/_/g;
+#  $filename =~ s/[^a-zA-Z0-9_]//g;
+#  my $datafile = "$filename\_q$qnum.df";
+#  my $plotfile = "$filename\_q$qnum.pdf";
+#  my $rscript = "sequence_duplication";
+#  
+#  
+#  # Check that the right number of value types have been supplied
+#  my $required_types = 1;
+#  my $this_sub = (caller(1))[3];
+#  unless (@$valtypes == $required_types) { die "ERROR: Incorrect number of value types supplied to $this_sub function\n(".@$valtypes." supplied, $required_types required)\n"; }
+#  # Check that all scales used in the supplied data types match
+#  my $intervals = $self->check_scale_identity($qualdata,$valtypes,'interval_names_scale');
+#  # Make the column headers for the output file (which will be the series names in the plot)
+#  my $colheads = ();
+#  foreach my $valtype (@$valtypes) {
+#    my $cleaned_up = ucfirst $valtype;
+#    $cleaned_up =~ s/_/ /g;
+#    push @$colheads, $cleaned_up;
+#  }
+#  
+#  # Write the data to the file we set a bit earlier
+#  $self->write_data_to_file($qualdata,$filename,$intervals,$valtypes,$colheads);
+#  
+#  # Set up arguments and execute the R script!
+#  my @args = ($datafile, $qnum, $plot_title, $xlabel, $ylabel);
+#  $self->call_rscript($rscript, \@args);
+#  return ($plotfile, $datafile);
+#}
 
 sub machine_activity_plot {
   # Makes a plot of when machines are actually engaged over a given time interval
+  # This uses very different data to that used by the funcs above. Don't rewrite until I'm sure what I'm doing.
+  # Given that it actually does carry out a function that isn't easily generalisable, I might leave it as it is.
   my $self = shift;
   my $inputs = shift;   # The standard hash reference to the inputs arranged above
   my $qualdata = shift; # File containing operations overview data
@@ -1112,16 +1310,16 @@ sub machine_activity_plot {
   
   # Set up arguments
   my @args = ("'".$inputs->{BEGIN}."'", "'".$inputs->{END}."'");
-  
+  # Passing data file as argument to call_rscript is deprecated; it should be passed as an argument to the R script.
   my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
-  
   return ($plotfile, $datafile);
 }
 
-sub adapter_performance_barplot {
+sub small_barplot {
   # Makes a simple bar plot. Data should be supplied as a hash reference, with
   # the hash keys being the names of the plots. Barcode tags can also be supplied
   # as a second hash reference.
+  # Again, this takes quite different data - it may not be right to rewrite it.
   my $self = shift;
   my $data = shift;
   my $tags = shift;
@@ -1144,9 +1342,8 @@ sub adapter_performance_barplot {
   
   # Set up arguments
   my @args = ("'".$title."' $lane");
-  
+  # Passing data file as argument to call_rscript is deprecated; it should be passed as an argument to the R script.
   my $plotfile = $self->call_rscript($rscript, $datafile, \@args);
-  
   return ($plotfile, $datafile);
 }
 
@@ -1554,7 +1751,7 @@ sub aggregate_data {
   }
 }
 
-sub rotate_query_results {
+sub rotate_query_results_col_to_row {
   # The results returned from aggregate_data are organised into columns.
   # This organises them by row, making it easier to print this stuff to stdout etc.
   # It's assumed that column references are supplied in the correct order.
@@ -1577,6 +1774,34 @@ sub rotate_query_results {
   return \@lines;
 }
 
+sub rotate_query_results_row_to_col {
+  # This organises query results by row, making it easier to get to specific columns.
+  # The inverse operation to rotate_query_results_col_to_row.
+  # Note that output of parse_query_results can also be understood by this function, as long as the header
+  # array reference is unshifted into the data array.
+  my $self = shift;
+  my @rows = @_;
+  # Input may have been passed as a reference; account for that here
+  if ((@rows == 1) && (ref $rows[0])) { @rows = @{$rows[0]}; }
+  
+  my $headstring = shift @rows;
+  my @headers = ();
+  if (ref $headstring) { @headers = @$headstring; }
+  else                 { @headers = split /,|\t/, $headstring; }
+  
+  my @columns = ();
+  $columns[0] = \@headers;
+  foreach my $line (@rows) {
+    my @data = ();
+    if (ref $line) { @data = @$line; }
+    else           { @data = split /,|\t/, $line; }
+    foreach my $i (1..@data) {
+      push @{$columns[$i]}, $data[$i-1];
+    }
+  }
+  
+  return \@columns;
+}
 
 sub sum {
   my $self = shift;
