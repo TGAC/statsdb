@@ -286,7 +286,7 @@ foreach my $query_set (@$query_sets) {
     # @vtdata contains 6 array references, which can be used as columns in a results table, in
     # the following order: column headers, position, size, mean, count and sum.
     # It can be flipped round from column-separated to row-separated data for ease of printing:
-    my $rotdata = $confuncs->rotate_query_results(@vtdata);
+    my $rotdata = $confuncs->rotate_query_results_col_to_row(@vtdata);
     
     if (@$rotdata >= 1) {
       # Print this data to stdout - it makes the output of this script machine-readable.
@@ -337,7 +337,7 @@ foreach my $query_set (@$query_sets) {
     # @vtdata contains 6 array references, which can be used as columns in a results table, in
     # the following order: column headers, position, size, mean, count and sum.
     # It can be flipped round from column-separated to row-separated data for ease of printing:
-    my $rotdata = $confuncs->rotate_query_results(@vtdata);
+    my $rotdata = $confuncs->rotate_query_results_col_to_row(@vtdata);
     
     if (@$rotdata >= 1) {
       # Print this data to stdout - it makes the output of this script machine-readable.

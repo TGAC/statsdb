@@ -314,9 +314,9 @@ foreach my $query_set (@$query_sets) {
   );
   
   # Store all that lovely data in a single data structure.
-  my %qualdata = ();
-  my @base_intervals = ();
-  my @interval_names = ();
+  my $qualdata = ();
+  #my @base_intervals = ();
+  #my @interval_names = ();
   foreach my $valtype (@per_position_value_types) {
     print "Querying $valtype\n";
     
@@ -324,7 +324,7 @@ foreach my $query_set (@$query_sets) {
     # @vtdata contains 6 array references, which can be used as columns in a results table, in
     # the following order: column headers, position, size, mean, count and sum.
     # It can be flipped round from column-separated to row-separated data for ease of printing:
-    my $rotdata = $confuncs->rotate_query_results(@vtdata);
+    my $rotdata = $confuncs->rotate_query_results_col_to_row(@vtdata);
     
     if (@$rotdata >= 1) {
       # Print this data to stdout - it makes the output of this script readable.
@@ -336,27 +336,31 @@ foreach my $query_set (@$query_sets) {
       # and plotting. The base positions and intervals should be stored, and the actual data
       # should be made easily and rationally accessible.
       # As well as simple base numbers, give intervals (i.e., partitions) in the format 'x-y'.
-      foreach my $basepos (@{$vtdata[1]}) {
-        my $interval_name = $basepos;
-        if ($base_intervals [-1]) {
-          if ($base_intervals [-1] < ($basepos - 1)) {
-            $interval_name = ($base_intervals [-1] + 1)."-$basepos";
-          }
-        }
-        push @interval_names, $interval_name;
-        push @base_intervals, $basepos;
-      }
+      # A function in Consumers.pm can handle that.
+      $confuncs->add_to_data_stash($qualdata,$rotdata,$valtype,'average');
       
-      # That's the base positions and interval names. Now store the actual data.
-      @{$qualdata{$valtype}} = @{$vtdata[3]};
+      #foreach my $basepos (@{$vtdata[1]}) {
+      #  my $interval_name = $basepos;
+      #  if ($base_intervals[-1]) {
+      #    if ($base_intervals[-1] < ($basepos - 1)) {
+      #      $interval_name = ($base_intervals[-1] + 1)."-$basepos";
+      #    }
+      #  }
+      #  push @interval_names, $interval_name;
+      #  push @base_intervals, $basepos;
+      #}
+      #
+      ## That's the base positions and interval names. Now store the actual data.
+      #@{$qualdata{$valtype}} = @{$vtdata[3]};
+      
     }
     else {
       print "No values found in database\n";
     }
   }
   
-  @interval_names = $confuncs->remove_duplicates(\@interval_names);
-  @base_intervals = $confuncs->remove_duplicates(\@base_intervals);
+  #@interval_names = $confuncs->remove_duplicates(\@interval_names);
+  #@base_intervals = $confuncs->remove_duplicates(\@base_intervals);
   
   # Other data types that don't fall into classes along the length of
   # the reads need to be handled differently. Each might have its own
@@ -376,7 +380,7 @@ foreach my $query_set (@$query_sets) {
     # @vtdata contains 6 array references, which can be used as columns in a results table, in
     # the following order: column headers, position, size, mean, count and sum.
     # It can be flipped round from column-separated to row-separated data for ease of printing:
-    my $rotdata = $confuncs->rotate_query_results(@vtdata);
+    my $rotdata = $confuncs->rotate_query_results_col_to_row(@vtdata);
     
     if (@$rotdata >= 1) {
       # Print this data to stdout - it makes the output of this script readable.
@@ -389,10 +393,13 @@ foreach my $query_set (@$query_sets) {
       # should be made easily and rationally accessible.
       # Unlike earlier data, these data may have their own independent scales, which need to be
       # recorded separately.
-      @{$independent_interval_names{$valtype}} = @{$vtdata[1]};
+      # A function in Consumers.pm can handle that.
+      $confuncs->add_to_data_stash($qualdata,$rotdata,$valtype,'average');
+      
+      #@{$independent_interval_names{$valtype}} = @{$vtdata[1]};
       
       # That's the scales. Now store the actual data.
-      @{$qualdata{$valtype}} = @{$vtdata[3]};
+      #@{$qualdata{$valtype}} = @{$vtdata[3]};
     }
     else {
       print "No values found in database\n";
@@ -440,11 +447,23 @@ foreach my $query_set (@$query_sets) {
   my @plotfiles = ();
   my @datafiles = ();
   
+  
   #####################
   # READ QUALITY PLOT #
   #####################
   print "Read quality plot\n";
-  my ($plotfile,$datafile) = $confuncs->read_quality_plot(\@interval_names,\%qualdata,$qnum);
+  #my ($plotfile,$datafile) = $confuncs->read_quality_plot(\@interval_names,\%qualdata,$qnum);
+  # Pick the value types that will be used for this plot
+  my $valtypes -> ('quality_90th_percentile',
+                   'quality_upper_quartile',
+                   'quality_mean',
+                   'quality_lower_quartile',
+                   'quality_10th_percentile',
+                   'quality_median');
+  my $title = "Quality scores across all bases";
+  my $xlabel = "Position in read (bp)";
+  my $ylabel = "Phred quality score";
+  my ($plotfile,$datafile) = $confuncs->freq_distribution_over_range_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -452,8 +471,11 @@ foreach my $query_set (@$query_sets) {
   # QUALITY DISTRIBUTION PLOT #
   #############################
   print "Quality distribution plot\n";
-  my @Xvals = @{$independent_interval_names{'quality_score_count'}};
-  ($plotfile,$datafile) = $confuncs->quality_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  $valtypes -> ('quality_score_count');
+  $title = "Quality score distribution over all sequences";
+  $xlabel = "Mean Sequence Quality (Phred Score)";
+  $ylabel = "Frequency";
+  ($plotfile,$datafile) = $confuncs->single_line_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -461,7 +483,14 @@ foreach my $query_set (@$query_sets) {
   # SEQUENCE CONTENT PLOT #
   #########################
   print "Sequence content plot\n";
-  ($plotfile,$datafile) = $confuncs->sequence_content_plot(\@interval_names,\%qualdata,$qnum);
+  $valtypes -> ('base_content_a',
+                'base_content_c',
+                'base_content_g',
+                'base_content_t',);
+  $title = "Sequence content across all bases";
+  $xlabel = "Position in read (bp)";
+  $ylabel = "Frequency of base (%)";
+  ($plotfile,$datafile) = $confuncs->sequence_content_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -469,7 +498,11 @@ foreach my $query_set (@$query_sets) {
   # GC CONTENT PLOT #
   ###################
   print "GC content plot\n";
-  ($plotfile,$datafile) = $confuncs->gc_content_plot(\@interval_names,\%qualdata,$qnum);
+  $valtypes -> ('gc_content_percentage');
+  $title = "GC content across all bases";
+  $xlabel = "Position in read (bp)";
+  $ylabel = "GC frequency (%)";
+  ($plotfile,$datafile) = $confuncs->single_line_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -477,8 +510,11 @@ foreach my $query_set (@$query_sets) {
   # GC DISTRIBUTION PLOT #
   ########################
   print "GC distribution plot\n";
-  @Xvals = @{$independent_interval_names{'gc_content_count'}};
-  ($plotfile,$datafile) = $confuncs->gc_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  $valtypes -> ('gc_content_count');
+  $title = "GC distribution over all sequences";
+  $xlabel = "Mean GC Content (%)";
+  $ylabel = "Frequency";
+  ($plotfile,$datafile) = $confuncs->normal_distribution_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -486,7 +522,11 @@ foreach my $query_set (@$query_sets) {
   # N CONTENT PLOT #
   ##################
   print "N content plot\n";
-  ($plotfile,$datafile) = $confuncs->n_content_plot(\@interval_names,\%qualdata,$qnum);
+  $valtypes -> ('gc_content_count');
+  $title = "Sequence content across all bases";
+  $xlabel = "Position in read (bp)";
+  $ylabel = "N frequency (%)";
+  ($plotfile,$datafile) = $confuncs->single_line_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -494,8 +534,16 @@ foreach my $query_set (@$query_sets) {
   # LENGTH DISTRIBUTION PLOT #
   ############################
   print "Length distribution plot\n";
-  @Xvals = @{$independent_interval_names{'sequence_length_count'}};
-  ($plotfile,$datafile) = $confuncs->length_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  # This is unique in that I may need to pad the data out a little. In an Illumina dataset, there may only
+  # be a single X axis point here. I need to add one to either side (with 0 as the y value) if so.
+  # Make a subroutine to do that. 
+  
+  
+  $valtypes -> ('sequence_length_count');
+  $title = "Distribution of sequnce lengths over all sequences";
+  $xlabel = "Sequence length (bp)";
+  $ylabel = "Frequency";
+  ($plotfile,$datafile) = $confuncs->length_distribution_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
   
@@ -503,10 +551,90 @@ foreach my $query_set (@$query_sets) {
   # SEQUENCE DUPLICATION PLOT #
   #############################
   print "Sequence distribution plot\n";
-  @Xvals = @{$independent_interval_names{'duplication_level_relative_count'}};
-  ($plotfile,$datafile) = $confuncs->sequence_duplication_plot(\@Xvals,\%qualdata,$qnum);
+  $valtypes -> ('duplication_level_relative_count');
+  $title = "Sequence duplication level";
+  $xlabel = "Sequence length (bp)";
+  $ylabel = "Relative frequency (%)";
+  ($plotfile,$datafile) = $confuncs->sequence_duplication_plot($qualdata,$valtypes,$title,$xlabel,$ylabel,$qnum);
   push @plotfiles, $plotfile;
   push @datafiles, $datafile;
+  
+  
+  ######################
+  ## READ QUALITY PLOT #
+  ######################
+  #print "Read quality plot\n";
+  ##my ($plotfile,$datafile) = $confuncs->read_quality_plot(\@interval_names,\%qualdata,$qnum);
+  ## Pick the value types that will be used for this plot
+  #my $valtypes -> ('quality_90th_percentile',
+  #                 'quality_upper_quartile',
+  #                 'quality_mean',
+  #                 'quality_lower_quartile',
+  #                 'quality_10th_percentile',
+  #                 'quality_median');
+  #my ($plotfile,$datafile) = $confuncs->freq_distribution_over_range_plot($qualdata,$valtypes,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  ##############################
+  ## QUALITY DISTRIBUTION PLOT #
+  ##############################
+  #print "Quality distribution plot\n";
+  #my @Xvals = @{$independent_interval_names{'quality_score_count'}};
+  #($plotfile,$datafile) = $confuncs->quality_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  ##########################
+  ## SEQUENCE CONTENT PLOT #
+  ##########################
+  #print "Sequence content plot\n";
+  #($plotfile,$datafile) = $confuncs->sequence_content_plot(\@interval_names,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  ####################
+  ## GC CONTENT PLOT #
+  ####################
+  #print "GC content plot\n";
+  #($plotfile,$datafile) = $confuncs->gc_content_plot(\@interval_names,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  #########################
+  ## GC DISTRIBUTION PLOT #
+  #########################
+  #print "GC distribution plot\n";
+  #@Xvals = @{$independent_interval_names{'gc_content_count'}};
+  #($plotfile,$datafile) = $confuncs->gc_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  ###################
+  ## N CONTENT PLOT #
+  ###################
+  #print "N content plot\n";
+  #($plotfile,$datafile) = $confuncs->n_content_plot(\@interval_names,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  #############################
+  ## LENGTH DISTRIBUTION PLOT #
+  #############################
+  #print "Length distribution plot\n";
+  #@Xvals = @{$independent_interval_names{'sequence_length_count'}};
+  #($plotfile,$datafile) = $confuncs->length_distribution_plot(\@Xvals,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
+  #
+  ##############################
+  ## SEQUENCE DUPLICATION PLOT #
+  ##############################
+  #print "Sequence distribution plot\n";
+  #@Xvals = @{$independent_interval_names{'duplication_level_relative_count'}};
+  #($plotfile,$datafile) = $confuncs->sequence_duplication_plot(\@Xvals,\%qualdata,$qnum);
+  #push @plotfiles, $plotfile;
+  #push @datafiles, $datafile;
   
   # Delete data files
   #unlink "quality.df";

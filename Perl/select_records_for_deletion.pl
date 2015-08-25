@@ -66,16 +66,11 @@ $help_string
 
 # Connect to the database
 GetOptions();
-print "DB configuration: ".$input_values->{DB_CONFIG}."\n";
-my $db = Reports::DB->new($input_values->{DB_CONFIG});
+my $config_file = $input_values->{DB_CONFIG};
+print "DB configuration: $config_file\n";
+my $db = Reports::DB->new($config_file);
 my $reports = Reports->new($db);
-
 my $confuncs = Consumers->new($reports);
-
-# If the duplicate_type input is set, make use of it.
-# It instructs the queries to return only the most recent copies of matching data in the database,
-# only older duplicates, or everything.
-$reports->set_duplicate_selection_type($input_values);
 
 # As validation, and for user confirmation, list all the records
 # in the database that correspond to the input list of parameters.
@@ -94,7 +89,6 @@ Type \"Delete these records\" to continue:\n\n";
 
 my $check = <STDIN>;
 chomp $check;
-
 unless ($check =~ /Delete these records/) {
   die "Delete aborted\n";
 }

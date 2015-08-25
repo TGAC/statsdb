@@ -2,7 +2,11 @@
 # horizontal.
 
 args <- commandArgs(trailingOnly = TRUE)
-qnum <- args[1]
+dataFile <- args[1]
+qnum <- args[2]
+plotTitle <- args[3]
+xLabel <- args[4]
+yLabel <- args[5]
 
 dataName <- paste("quality_q", qnum, ".df", sep="")
 qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
