@@ -240,7 +240,7 @@ foreach my $query_set (@$query_sets) {
   print "Querying analysis properties\nPROPERTY,VALUE\n";
   foreach my $line (@$returned_values) {
     my @sp = split /,/, $line;
-    my $property = $sp [0]; my $value = $sp [1];
+    my $property = $sp[0]; my $value = $sp[1];
     
     # Prevent this from producing entries for data that is actually missing.
     # (E.g., barcodes, frequently)
@@ -251,6 +251,19 @@ foreach my $query_set (@$query_sets) {
   }
   print "\n-----\n";
   
+  # Before we generate a label, it would be handy to have some date information to put in it.
+  # Use get_dates_for_run to... well, take a guess.
+  # Parse that into a hash so we can get the bits we need shortly.
+  my %date_info = ();
+  $qry = $reports->get_dates_for_run(\%query_properties);
+  $avg = $qry->to_csv;
+  ($column_headers,$returned_values) = $confuncs->parse_query_results($avg);
+  foreach my $line (@$returned_values) {
+    my @sp = split /,/, $line;
+    my $type = $sp[0];  my $date = $sp[1];
+    $date_info{$type} = $date;
+  }
+  
   # Set up a label to go at the top of the report.
   # Pick sample names, if those are specified.
   # If not, use lanes.
@@ -258,23 +271,25 @@ foreach my $query_set (@$query_sets) {
   # and if (for some reason) everything is missing, just use a generic
   # string.
   my $queryset_label = ();
+  my $d1 = $date_info{run_start};   my $d2 = $date_info{run_end};
+  my $d3 = $date_info{read_start};  my $d4 = $date_info{read_end};
   if ($query_properties{SAMPLE_NAME}) {
     $queryset_label = "Sample ".$query_properties{SAMPLE_NAME};
     if ($query_properties{PAIR}) {
-      $queryset_label = "$queryset_label, Read ".$query_properties{PAIR};
+      $queryset_label = "$queryset_label, Read ".$query_properties{PAIR}." ($d3 to $d4)";
     }
   }
   elsif ($query_properties{LANE}) {
     $queryset_label = "Lane ".$query_properties{LANE};
     if ($query_properties{BARCODE}) {
-      $queryset_label = "$queryset_label, Barcode ".$query_properties{BARCODE};
+      $queryset_label = "$queryset_label, Barcode ".$query_properties{BARCODE}." ($d3 to $d4)";
     }
     if ($query_properties{PAIR}) {
-      $queryset_label = "$queryset_label, Read ".$query_properties{PAIR};
+      $queryset_label = "$queryset_label, Read ".$query_properties{PAIR}." ($d3 to $d4)";
     }
   }
   elsif ($query_properties{RUN}) {
-    $queryset_label = "Run ".$query_properties{RUN};
+    $queryset_label = "Run ".$query_properties{RUN}." ($d1 to $d2)";
   }
   elsif ($query_properties{INSTRUMENT}) {
     $queryset_label = "Instrument ".$query_properties{INSTRUMENT};

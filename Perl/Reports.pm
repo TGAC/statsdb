@@ -478,8 +478,6 @@ sub list_all_runs {
 
 sub get_runs_between_dates() {
   # Retrieves runs that were inserted into the database between two given timepoints
-  # Note that since the actual time of the analysis is recorded, this data will change
-  # if the database is repopulated.
   
   my $self = shift;
   my $pref = shift;
@@ -496,6 +494,33 @@ sub get_runs_between_dates() {
   $sth->bind_param(1, $args[0]);
   $sth->bind_param(2, $args[1]);
   $sth->bind_param(3, $args[2]);
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_dates_for_run() {
+  # Gets all the dates and their labels associated with a given set of inputs.
+  
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL get_dates_for_run(?,?,?,?,?,?)";
+  
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..6) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
 

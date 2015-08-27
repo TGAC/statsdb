@@ -160,6 +160,35 @@ BEGIN
 	;
 END$$
 
+DROP PROCEDURE IF EXISTS get_dates_for_run$$
+CREATE PROCEDURE get_dates_for_run(
+	IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500),
+	IN pair_in VARCHAR(500),
+    IN sample_name_in VARCHAR(500),
+	IN barcode_in VARCHAR(500))
+BEGIN
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		pair_in,
+		sample_name_in,
+		barcode_in,
+		NULL)
+	;
+    
+	SELECT DISTINCT
+		property as property,
+		date as date
+	FROM analysis_date
+	WHERE analysis_date.analysis_id IN
+		(SELECT * FROM analysis_ids_tmp)
+	;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+END$$
+
 DROP PROCEDURE IF EXISTS operation_overview$$
 CREATE PROCEDURE operation_overview(
 	IN date1 TIMESTAMP,
