@@ -413,7 +413,7 @@ BEGIN
 --		GROUP BY value_type.id, position
 --		ORDER BY Position
 --		;
---	END IF;
+--	END IF;get_analysis_id
 
 --  This seems to result in a truly massive increase in speed, largely by
 --  eliminating the use of the run/latest_run views, which are complex and
@@ -637,11 +637,12 @@ get_ids:BEGIN
 		WHERE analysis_id NOT IN (
 			SELECT analysis_id
 			FROM an_ids_tmp4)
+        LEAVE get_ids;
 		;
-	ELSE 
-		SELECT analysis_id
-		FROM an_ids_tmp4;
 	END IF;
+    
+    SELECT analysis_id
+	FROM an_ids_tmp4;
 
 	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
 	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
@@ -823,12 +824,13 @@ get_ids:BEGIN
 			SELECT analysis_id
 			FROM an_ids_tmp4)
 		;
-	ELSE 
-		DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
-		CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
-		SELECT analysis_id
-		FROM an_ids_tmp4;
+        LEAVE get_ids;
 	END IF;
+    
+    DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+    CREATE TEMPORARY TABLE analysis_ids_tmp ENGINE=MEMORY AS
+    SELECT analysis_id
+    FROM an_ids_tmp4;
 
 	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp1;
 	DROP TEMPORARY TABLE IF EXISTS an_ids_tmp2;
