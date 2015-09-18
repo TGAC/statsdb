@@ -311,6 +311,52 @@ foreach my $query_set (@$query_sets) {
   # We can then access specific bits of it at will.
   my $dbdata = $confuncs->get_all_queryset_data($query_set);
   
+  # Store all that lovely data in a single data structure.
+  my $qualdata = ();
+  
+  # A list of single values per analysis, that may still need to be averaged/summed over the scope of the current
+  # query set.
+  my @analysis_value_types_mean = (
+    'density_mean',
+    'densitypf_mean'
+  );
+  foreach my $valtype (@analysis_value_types_mean) {
+    print "Querying $valtype\n";
+    
+    my @vtdata = $confuncs->aggregate_data($dbdata, $valtype);
+    # @vtdata contains an array reference (column headers) and 3 single figures: mean, count and sum.
+    # Here, we want the mean. That can simply be dumped directly into our data stash as is.
+    my $mean = $vtdata[1];
+    if ($mean) {
+      $confuncs->add_to_data_stash($qualdata,$mean,$valtype);
+      print "$valtype\t$mean\n";
+    }
+    else {
+      print "No values found in database\n";
+    }
+  }
+  
+  my @analysis_value_types_sum = (
+    'clusters_mean',
+    'clusterspf_mean'
+  );
+  
+  foreach my $valtype (@analysis_value_types_sum) {
+    print "Querying $valtype\n";
+    
+    my @vtdata = $confuncs->aggregate_data($dbdata, $valtype);
+    # @vtdata contains an array reference (column headers) and 3 single figures: mean, count and sum.
+    # Here, we want the mean. That can simply be dumped directly into our data stash as is.
+    my $sum = $vtdata[3];
+    if ($sum) {
+      $confuncs->add_to_data_stash($qualdata,$sum,$valtype);
+      print "$valtype\t$sum\n";
+    }
+    else {
+      print "No values found in database\n";
+    }
+  }
+  
   # A list of data types falling into classes along the read length
   # (Grouped together this way for convenient handling - they're all treated the same)
   my @per_position_value_types = (
@@ -328,8 +374,7 @@ foreach my $query_set (@$query_sets) {
     'base_content_n_percentage'
   );
   
-  # Store all that lovely data in a single data structure.
-  my $qualdata = ();
+  
   #my @base_intervals = ();
   #my @interval_names = ();
   foreach my $valtype (@per_position_value_types) {
@@ -791,7 +836,11 @@ foreach my $query_set (@$query_sets) {
     'sample_name',
     'barcode',
     'pair',
-    'reference'
+    'reference',
+    'clusters_mean',
+    'clusterspf_mean',
+    'density_mean',
+    'densitypf_mean'
   );
   
   # For specific circumstances, I might want to print a list of things, rather
