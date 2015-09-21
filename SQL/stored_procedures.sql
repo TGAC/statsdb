@@ -114,6 +114,33 @@ BEGIN
 	;
 END$$
 
+DROP PROCEDURE IF EXISTS list_contaminants$$
+CREATE PROCEDURE list_contaminants(
+	IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500))
+BEGIN
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		NULL,NULL,NULL,NULL)
+	;
+	
+	SELECT value
+    FROM statsdb.analysis_property
+	WHERE analysis_id IN(
+		SELECT analysis_id 
+		FROM analysis_property
+		WHERE property = 'tool'
+		AND value like 'KMER_CONTAMINATION%')
+	AND analysis_id IN
+		(SELECT * FROM analysis_ids_tmp)
+	AND property = 'reference'
+	;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+END$$
+
 DROP PROCEDURE IF EXISTS list_selectable_properties$$
 CREATE PROCEDURE list_selectable_properties()
 BEGIN 

@@ -40,7 +40,7 @@ rect(x1, y1, x2, y2,
      border = NA,
      col = "#99999933")
 
-title(main = 'Distribution of sequnce lengths over all sequences', 
+title(main = 'Distribution of sequence lengths over all sequences', 
       cex.main = 0.8)
 
 axis (1, 
