@@ -141,6 +141,51 @@ BEGIN
 	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
 END$$
 
+DROP PROCEDURE IF EXISTS contaminant_summary$$
+CREATE PROCEDURE contaminant_summary(
+	IN contaminant_in VARCHAR(500),
+	IN instrument_in VARCHAR(500),
+	IN run_in VARCHAR(500),
+	IN lane_in VARCHAR(500))
+BEGIN
+	CALL get_analysis_id_as_temp_table(
+		instrument_in,
+		run_in,
+		lane_in,
+		NULL,NULL,NULL,NULL)
+	;
+	
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_contaminants_tmp;
+	CREATE TEMPORARY TABLE analysis_ids_contaminants_tmp ENGINE=INNODB AS
+	SELECT DISTINCT analysis_id 
+	FROM statsdb.analysis_property
+	WHERE analysis_id IN(
+		SELECT analysis_id 
+		FROM analysis_property
+		WHERE property = 'tool'
+		AND value like 'KMER_CONTAMINATION%')
+	AND analysis_id IN
+		(SELECT * FROM analysis_ids_tmp)
+	AND analysis_id IN
+		(SELECT analysis_id
+		FROM analysis_property
+		WHERE property = 'reference'
+		AND value = contaminant_in)
+	;
+	
+	SELECT 
+		av.value AS value,
+		vt.description AS value_type
+	FROM analysis_value AS av
+	INNER JOIN value_type AS vt
+		ON av.value_type_id = vt.id
+	WHERE av.analysis_id IN(
+		SELECT * FROM analysis_ids_contaminants_tmp)
+	;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_tmp;
+	DROP TEMPORARY TABLE IF EXISTS analysis_ids_contaminants_tmp;
+END$$
+
 DROP PROCEDURE IF EXISTS list_selectable_properties$$
 CREATE PROCEDURE list_selectable_properties()
 BEGIN 
