@@ -738,8 +738,8 @@ get_ids:BEGIN
 		WHERE analysis_id NOT IN (
 			SELECT analysis_id
 			FROM an_ids_tmp4)
+        ;
         LEAVE get_ids;
-		;
 	END IF;
     
     SELECT analysis_id
