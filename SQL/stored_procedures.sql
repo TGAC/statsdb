@@ -37,7 +37,7 @@ BEGIN
 	AND scope_l = scope;
 END$$ 
 
-DROP PROCEDURE IF EXISTS list_selectable_values_per_run$$
+DROP PROCEDURE IF EXISTS list_selectable_values_for_run$$
 CREATE PROCEDURE list_selectable_values_for_run(
 	IN instrument_in VARCHAR(500),
 	IN run_in VARCHAR(500),
