@@ -1,0 +1,18 @@
+Working examples:
+python$ python example_consumer.py --show_tables
+python example_consumer.py --display_table analysis
+python example_consumer.py --db_config examples/template_db.txt --get_average_values --instrument M01242 --run "130726_M01242_0028_000000000-A4FE1" --lane 1 --pair 1 --barcode " " --scope base_partition
+python example_consumer.py --db_config examples/template_db.txt --get_summary_values_with_comments --instrument M01242 --run "130726_M01242_0028_000000000-A4FE1" --lane 1 --pair 1 --barcode " " --scope analysis
+python example_consumer.py --db_config examples/template_db.txt --get_per_position_values --instrument M01242 --run "130726_M01242_0028_000000000-A4FE1" --lane 1 --pair 1 --barcode " " --analysis quality_mean
+python example_consumer.py --db_config examples/template_db.txt --list_all_runs_for_instrument M01242
+python example_consumer.py --db_config examples/template_db.txt --list_all_runs
+python example_consumer.py --db_config examples/template_db.txt --list_lanes_for_run --run 140704_SN790_0356_AC491LACXX
+python example_consumer.py --db_config examples/template_db.txt --list_barcodes_for_run_and_lane --run 140704_SN790_0356_AC491LACXX --lane 1
+python example_consumer.py --db_config examples/template_db.txt --get_samples_from_run_lane_barcode --run 130705_M01242_0025_000000000-A5AC4 --lane 1 --barcode AAGGATTCC
+
+python example_consumer.py --db_config examples/template_db.txt --get_analysis_id --run 130705_M01242_0025_000000000-A5AC4 --lane 1 --barcode AAGGATTCC --pair 1 --instrument M01242
+
+python example_consumer.py --db_config examples/template_db.txt --get_analysis_id --run 130705_M01242_0025_000000000-A5AC4
+python example_consumer.py --db_config examples/template_db.txt --get_properties_for_analysis_ids --analysis_ids 3,30
+
+	

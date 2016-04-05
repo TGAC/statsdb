@@ -1,0 +1,4 @@
+PROPERTY,VALUE
+Encoding,Sanger / Illumina 1.9
+lane,1
+run_folder,/net/tgac-ngs-qc/vol/qc/130725_SN7001150_0155_BH0L68ADXX/PAP
