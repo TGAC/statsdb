@@ -1,0 +1,125 @@
+# This is how StatsDB is specifically instructed to record certain data types and not others.
+
+# FastQC data types
+general_min_length	fastqc	yes
+general_total_sequences	fastqc	yes
+general_gc_content	fastqc	yes
+general_filtered_sequences	fastqc	yes
+general_max_length	fastqc	yes
+total_duplicate_percentage	fastqc	yes
+duplication_level_relative_count	fastqc	yes
+quality_score_count	fastqc	yes
+quality_mean	fastqc	yes
+base_content_c	fastqc	yes
+quality_lower_quartile	fastqc	yes
+quality_upper_quartile	fastqc	yes
+base_content_n_percentage	fastqc	yes
+base_content_g	fastqc	yes
+gc_content_count	fastqc	yes
+quality_median	fastqc	yes
+base_content_a	fastqc	yes
+sequence_length_count	fastqc	yes
+gc_content_percentage	fastqc	yes
+base_content_t	fastqc	yes
+quality_10th_percentile	fastqc	yes
+quality_90th_percentile	fastqc	yes
+
+# Kontaminant data types
+sampled_reads	kmercontamination	yes
+sample_size_ratio	kmercontamination	yes
+ref_kmer_percent	kmercontamination	yes
+percentage	kmercontamination	yes
+contaminated_reads	kmercontamination	yes
+
+# MISO data types
+QuBit_result	yes
+Bioanalyzer_result	yes
+
+# InterOp data types
+percentprephasing_lower_quartile	interop_TileMetrics	yes
+clusters_stdev	interop_TileMetrics	yes
+percentphasing_stdev	interop_TileMetrics	yes
+percentprephasing_mean	interop_TileMetrics	yes
+clusterspf_stdev	interop_TileMetrics	yes
+percentaligned_mean	interop_TileMetrics	yes
+clusters_mean	interop_TileMetrics	yes
+densitypf_mean	interop_TileMetrics	yes
+percentprephasing_min	interop_TileMetrics	yes
+percentphasing_max	interop_TileMetrics	yes
+percentprephasing_upper_quartile	interop_TileMetrics	yes
+density_stdev	interop_TileMetrics	yes
+percentaligned_stdev	interop_TileMetrics	yes
+density_mean	interop_TileMetrics	yes
+percentphasing_upper_quartile	interop_TileMetrics	yes
+percentphasing_median	interop_TileMetrics	yes
+percentphasing_mean	interop_TileMetrics	yes
+percentprephasing_max	interop_TileMetrics	yes
+percentphasing_min	interop_TileMetrics	yes
+percentprephasing_median	interop_TileMetrics	yes
+clusterspf_mean	interop_TileMetrics	yes
+percentprephasing_stdev	interop_TileMetrics	yes
+percentphasing_lower_quartile	interop_TileMetrics	yes
+densitypf_stdev	interop_TileMetrics	yes
+percentprephasing	interop_TileMetrics	yes
+snr_stdev	interop_CorrectedIntMetrics	no
+avg_intensity_stdev	interop_CorrectedIntMetrics	no
+avg_called_int_t_mean	interop_CorrectedIntMetrics	no
+avg_called_int_a_mean	interop_CorrectedIntMetrics	no
+num_basecalls_c	interop_CorrectedIntMetrics	no
+num_basecalls_n	interop_CorrectedIntMetrics	no
+snr_mean	interop_CorrectedIntMetrics	no
+snr_min	interop_CorrectedIntMetrics	no
+avg_corrected_int_a_mean	interop_CorrectedIntMetrics	no
+avg_called_int_t_stdev	interop_CorrectedIntMetrics	no
+avg_corrected_int_t_stdev	interop_CorrectedIntMetrics	no
+snr_lower_quartile	interop_CorrectedIntMetrics	no
+avg_intensity_mean	interop_CorrectedIntMetrics	no
+snr_max	interop_CorrectedIntMetrics	no
+avg_called_int_g_mean	interop_CorrectedIntMetrics	no
+snr_median	interop_CorrectedIntMetrics	no
+snr_upper_quartile	interop_CorrectedIntMetrics	no
+num_basecalls_g	interop_CorrectedIntMetrics	no
+num_basecalls_a	interop_CorrectedIntMetrics	no
+avg_called_int_c_mean	interop_CorrectedIntMetrics	no
+avg_called_int_g_stdev	interop_CorrectedIntMetrics	no
+num_basecalls_t	interop_CorrectedIntMetrics	no
+avg_corrected_int_g_mean	interop_CorrectedIntMetrics	no
+avg_corrected_int_c_mean	interop_CorrectedIntMetrics	no
+avg_corrected_int_g_stdev	interop_CorrectedIntMetrics	no
+avg_corrected_int_t_mean	interop_CorrectedIntMetrics	no
+avg_corrected_int_c_stdev	interop_CorrectedIntMetrics	no
+avg_called_int_c_stdev	interop_CorrectedIntMetrics	no
+avg_called_int_a_stdev	interop_CorrectedIntMetrics	no
+avg_corrected_int_a_stdev	interop_CorrectedIntMetrics	no
+err_rate_median	interop_ErrorMetrics	no
+err_rate_stdev	interop_ErrorMetrics	no
+err_rate_min	interop_ErrorMetrics	no
+err_rate_upper_quartile	interop_ErrorMetrics	no
+err_rate_max	interop_ErrorMetrics	no
+err_rate_lower_quartile	interop_ErrorMetrics	no
+err_rate_mean	interop_ErrorMetrics	no
+intensities_c_stdev	interop_ExtractionMetrics	no
+fwhm_t_mean	interop_ExtractionMetrics	no
+intensities_g_mean	interop_ExtractionMetrics	no
+fwhm_t_stdev	interop_ExtractionMetrics	no
+fwhm_g_stdev	interop_ExtractionMetrics	no
+intensities_g_stdev	interop_ExtractionMetrics	no
+intensities_a_mean	interop_ExtractionMetrics	no
+fwhm_c_mean	interop_ExtractionMetrics	no
+fwhm_a_stdev	interop_ExtractionMetrics	no
+intensities_a_stdev	interop_ExtractionMetrics	no
+intensities_t_mean	interop_ExtractionMetrics	no
+fwhm_a_mean	interop_ExtractionMetrics	no
+intensities_t_stdev	interop_ExtractionMetrics	no
+fwhm_c_stdev	interop_ExtractionMetrics	no
+fwhm_g_mean	interop_ExtractionMetrics	no
+intensities_c_mean	interop_ExtractionMetrics	no
+qscore_lower_quartile	interop_QualityMetrics	no
+qscore_median	interop_QualityMetrics	no
+qscore_upper_quartile	interop_QualityMetrics	no
+percent_q30	interop_QMetrics	no
+qscore_max	interop_QMetrics	no
+qscore_stdev	interop_QMetrics	no
+percent_q20	interop_QMetrics	no
+qscore_mean	interop_QMetrics	no
+qscore_min	interop_QMetrics	no

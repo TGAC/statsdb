@@ -1,10 +1,16 @@
+args <- commandArgs(trailingOnly = TRUE)
+qnum <- args[1]
 
-qualdata <- read.delim("seq_content.df", header = TRUE, as.is = TRUE)
+dataName <- paste("seq_content_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 dat <- subset(qualdata, select = c('A','T','G','C'))
 xvals = seq(from = 1, to = nrow(qualdata), by = 1)
 percentvals = seq (from = 0, to = 100, by = 10)
 
-pdf(file = "sequence_content_plot.pdf", width = 8, height = 6)
+plotName <- paste("sequence_content_plot_q", qnum, ".pdf", sep="")
+pdf(file = plotName, width = 8, height = 6)
+print(paste("PLOT FILE:",plotName))
+flush.console()
 
 marginSpaces = c(1, 0.1, 0)
 par (mgp = marginSpaces, tcl = -0.2)

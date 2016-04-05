@@ -1,3 +1,7 @@
 db_string dbi:mysql:statsdb;host=localhost
 db_user	statsdb
 db_password	statsdb
+miso_string	http://miso.tgac.ac.uk
+miso_user	username
+miso_api_key	api_key
+data_types_config_file	/usr/users/ga002/pearsonn/LocalScripts/statsdb/Perl/examples/data_types_config.txt

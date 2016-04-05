@@ -34,6 +34,8 @@ sub get_connection() {
 }
 
 sub list_global_analyses() {
+  # List the types of summary values in the 'analysis' scope - max run length,
+  # number of sequences, overall GC content etc.
   my $self = shift;
   my $con = $self->get_connection();
   
@@ -44,7 +46,63 @@ sub list_global_analyses() {
   return Reports::ReportTable->new($sth);
 }
 
+sub set_duplicate_detection_type() {
+  my $self = shift;
+  my $pref = shift;
+  # IMPORTANT: This functionality works by setting a session variable in MySQL.
+  # Obviously, session variables don't persist once you disconnect; but all of the existing
+  # SQL functions in this module re-establish connection when they're called. We therefore
+  # have to call this once a session has been established (where appropriate). One of the
+  # inputs to this sub must also be the connection parameters of the session. Hence:
+  my $con = shift;
+  
+  my @args = (undef);
+  $args[0] = $pref->{DUPLICATE_TYPE} if exists $pref->{DUPLICATE_TYPE};
+  
+  if ($args[0]) {
+    my $statement = "CALL set_duplicate_selection_type(?)";
+    my $sth = $con->prepare($statement) || die $con->errstr;
+    $sth->bind_param(1, $args[0]);
+    $sth->execute();
+  }
+  
+  # Don't return anything; this query doesn't.
+  #return Reports::ReportTable->new($sth);
+}
+
+sub detect_duplicates() {
+  # Runs a stored procedure that detects duplicate records matching input parameters
+  # in the database
+  # (old, new or all; specified by set_duplicate_detection_type)
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL detect_duplicates(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
 sub list_per_base_summary_analyses() {
+  # List the types of values in the base_partition scope, in which a result value
+  # is supplied for a range of determinant values. Mean and quartiles for quality
+  # measurements, percent GC, content of individual bases.
   my $self = shift;
   my $con = $self->get_connection();
 
@@ -56,16 +114,22 @@ sub list_per_base_summary_analyses() {
 }
 
 sub get_per_position_summary() {
+  # Get averaged per-position (e.g., per base) values for a given partition and
+  # data type
   my $self = shift;
   my $analysis = shift;
   my $analysis_property = shift;
   my $analysis_property_value = shift;
-
+  
   my $con = $self->get_connection();
   my $statement = "CALL summary_per_position(?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($analysis, $analysis_property, $analysis_property_value);
-
+  $sth->bind_param(1, $analysis);
+  $sth->bind_param(2, $analysis_property);
+  $sth->bind_param(3, $analysis_property_value);
+  
+  $sth->execute();
+  
   return Reports::ReportTable->new($sth);
 }
 
@@ -78,31 +142,36 @@ sub get_average_value() {
   my $con = $self->get_connection();
   my $statement = "CALL general_summary(?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($analysis, $analysis_property, $analysis_property_value);
+  $sth->bind_param(1, $analysis);
+  $sth->bind_param(2, $analysis_property);
+  $sth->bind_param(3, $analysis_property_value);
+  
+  $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
 sub get_average_values() {
+  # Returns a list of averaged summary values across a given combination of
+  # instrument, run, lane, pair and barcode
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{BARCODE} if exists $properties{BARCODE};
+  my @args = (undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
   
-  my $statement = "CALL general_summaries_for_run(?,?,?,?,?)";
+  my $statement = "CALL general_summaries_for_run(?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
+  foreach my $i (1..6) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
   
   $sth->execute();
   
@@ -110,94 +179,227 @@ sub get_average_values() {
 }
 
 sub get_per_position_values() {
+  # Query the database for data of a single value-type for the corresponding run parameters
   my $self = shift;
   my $analysis = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $analysis;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
-  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?)";
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[7] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL summary_per_position_for_run(?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-
+  foreach my $i (1..8) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
+sub per_analysis_values_for_run() {
+  # Query the database for data from all per-analysis data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL analysis_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub per_position_values_for_run() {
+  # Query the database for data from all per-position data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL position_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub per_partition_values_for_run() {
+  # Query the database for data from all per-partition data for the corresponding run parameters
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
+  
+  my $statement = "CALL partition_values_for_run(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+
 sub get_summary_values_with_comments() {
+  # Get summary values with additional information stored as linked comments
+  # across any combination of instrument, run, lane, pair and barcode
   my $self = shift;
   my $scope = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
-  my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?)";
-  my $con = $self->get_connection();
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
   
+  my $statement = "CALL summary_value_with_comment(?,?,?,?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
 sub get_summary_values() {
+  # Get averaged summary values across any combination of instrument, run,
+  # lane, pair and barcode
   my $self = shift;
   my $scope = shift;
   my $pref = shift;
-  my %properties = %$pref; 
 
-  my @args = (undef, undef, undef, undef, undef, undef);
+  my @args = (undef, undef, undef, undef, undef, undef, undef);
   $args[0] = $scope;
-  $args[1] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[2] = $properties{RUN} if exists $properties{RUN};
-  $args[3] = $properties{LANE} if exists $properties{LANE};
-  $args[4] = $properties{PAIR} if exists $properties{PAIR};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-
-  my $statement = "CALL summary_value(?,?,?,?,?,?)";
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  $args[4] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[5] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[6] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  
+  my $statement = "CALL summary_value(?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->bind_param(1, $args[0]);
-  $sth->bind_param(2, $args[1]);
-  $sth->bind_param(3, $args[2]);
-  $sth->bind_param(4, $args[3]);
-  $sth->bind_param(5, $args[4]);
-  $sth->bind_param(6, $args[5]);
-
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
+sub list_contaminants () {
+  # Returns a list of contaminants that were screened against for a given set of inputs
+  # (instrument, run and lane)
+  my $self = shift;
+  my $pref = shift;
+
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  
+  my $statement = "CALL list_contaminants(?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..3) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub contaminant_summary () {
+  # Returns a set of screening statistics for a set of instrument, run and lane
+  # analyses and a reference genome screened against. 
+  my $self = shift;
+  my $reference = shift;
+  my $pref = shift;
+
+  my @args = (undef, undef, undef);
+  $args[0] = $reference;
+  $args[1] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[2] = $pref->{RUN} if exists $pref->{RUN};
+  $args[3] = $pref->{LANE} if exists $pref->{LANE};
+  
+  my $statement = "CALL contaminant_summary(?,?,?,?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..4) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
 sub get_analysis_properties() {
+  # Get a list of all the different properties that are available for all
+  # analyses.
   my $self = shift;
   my $con = $self->get_connection();
 
@@ -209,6 +411,8 @@ sub get_analysis_properties() {
 }
 
 sub get_values_for_property() {
+  # Given an analysis property, this lists all selectable values associated
+  # with it.
   my $self = shift;
   my $property = shift;
   my $con = $self->get_connection();
@@ -223,9 +427,9 @@ sub get_values_for_property() {
 sub list_all_runs_for_instrument() {
   my $self = shift;
   my $instrument = shift;
-
   my $con = $self->get_connection();
-  my $statement = "SELECT run FROM run WHERE `instrument` = ? GROUP BY run";
+  
+  my $statement = "CALL list_runs_for_instrument(?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->execute($instrument);
 
@@ -233,33 +437,162 @@ sub list_all_runs_for_instrument() {
 }
 
 sub list_all_instruments {
+  # This sub uses a stored procedure that returns the instrument ID
+  # for any given combination of instrument, run, lane, pair, sample name and
+  # barcode. Those are all left undef here, though, so this returns a list of
+  # all instruments.
   my $self = shift;
-
+  
   my $con = $self->get_connection();
-  my $statement = "SELECT instrument FROM run GROUP BY instrument";
+  #my $statement = "SELECT instrument FROM run GROUP BY instrument";
+  # NOTE: NOT sure what happens, yet, when I leave these parameters unset.
+  # Try it.
+  my $statement = "CALL list_instruments (?,?,?,?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..6) {
+    $sth->bind_param($i, undef);
+  }
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub list_all_runs {
+  # This sub uses a stored procedure that returns the run ID
+  # for any given combination of instrument, run, lane, pair, sample name and
+  # barcode. Those are all left undef here, though, so this returns a list of
+  # all runs.
+  my $self = shift;
+  
+  my $con = $self->get_connection();
+  #my $statement = "SELECT run FROM run GROUP BY run";
+  my $statement = "CALL list_instruments (?,?,?,?,?,?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..6) {
+    $sth->bind_param($i, undef);
+  }
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_runs_between_dates() {
+  # Retrieves runs that were inserted into the database between two given timepoints
+  
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[1] = $pref->{END} if exists $pref->{END};
+  $args[2] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL select_runs_between_dates(?,?,?)";
+  
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  $sth->bind_param(2, $args[1]);
+  $sth->bind_param(3, $args[2]);
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
-sub list_all_runs {
+sub get_dates_for_run() {
+  # Gets all the dates and their labels associated with a given set of inputs.
+  
   my $self = shift;
-
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  
   my $con = $self->get_connection();
-  my $statement = "SELECT run FROM run GROUP BY run";
+  my $statement = "CALL get_dates_for_run(?,?,?,?,?,?)";
+  
   my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..6) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_operation_overview() {
+  # Retrieves runs that were inserted into the database between two given timepoints
+  # Note that since the actual time of the analysis is recorded, this data will change
+  # if the database is repopulated.
+  
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef, undef, undef);
+  $args[0] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[1] = $pref->{END} if exists $pref->{END};
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL operation_overview(?,?)";
+  
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  $sth->bind_param(2, $args[1]);
+  
+  $sth->execute();
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_library_type_for_run() {
+  # Get library type - i.e., baired-end, RNAseq etc., for a given run
+  my $self = shift;
+  my $pref = shift;
+
+  my @args = (undef);
+  $args[0] = $pref->{RUN} if exists $pref->{RUN};
+  
+  my $statement = "CALL get_lib_type_for_run(?)";
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->bind_param(1, $args[0]);
+  
   $sth->execute();
 
   return Reports::ReportTable->new($sth);
 }
 
 sub list_lanes_for_run() {
+  # This uses a less generalist function than the previous two subs
+  # to return the lanes in a run 
   my $self = shift;
   my $run = shift;
-
+  
   my $con = $self->get_connection();
-  my $statement = "SELECT lane FROM run WHERE `run` = ? GROUP BY lane";
+  #my $statement = "SELECT lane FROM run WHERE `run` = ? GROUP BY lane";
+  my $statement = "CALL list_lanes_for_run (?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($run);
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub count_reads_for_run() {
+  # This uses a less generalist function than the previous two subs
+  # to return the lanes in a run 
+  my $self = shift;
+  my $run = shift;
+  
+  my $con = $self->get_connection();
+  my $statement = "CALL count_reads_for_run(?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->execute($run);
   
@@ -267,78 +600,51 @@ sub list_lanes_for_run() {
 }
 
 sub list_subdivisions() {
-  # Assemble a query to get all the available runs, lanes on a run etc. when passed
-  # a given set of information. Generalist by design.
-  # Get inputs via a hash. Assemble query internally.
+  # This is for assembling the query sets used by a consumer.
+  # For example, a user may wish to set up a series of independent queries
+  # for every sample in a run (as opposed to averaging all results in the run).
+  # When supplied with inputs provided by the user, including a query scope,
+  # this function returns the information required for each of those independent
+  # queries as a single row.
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
-  my @args = (undef, undef, undef, undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE_NAME} if exists $properties{SAMPLE_NAME};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
-  $args[6] = $properties{QSCOPE} if exists $properties{QSCOPE};
+  my @args = (undef, undef, undef, undef,
+              undef, undef, undef, undef,
+              undef, undef, undef, undef);
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{ANALYSIS} if exists $pref->{ANALYSIS};
+  $args[7] = $pref->{BEGIN} if exists $pref->{BEGIN};
+  $args[8] = $pref->{END} if exists $pref->{END};
+  $args[9] = $pref->{DATETYPE} if exists $pref->{DATETYPE};
+  $args[10] = $pref->{TOOL} if exists $pref->{TOOL};
+  $args[11] = $pref->{QSCOPE} if exists $pref->{QSCOPE};
   
-  # Add bits to the statement to reflect available information
-  # GROUP BY column supplied as queryscope (plus higher-level scopes)
-  
-  my @available_columns = ('instrument','run','lane','sample_name','barcode','pair');
-  my @retrieve_these = ();
-  my $col = ();
-  if ($args[6]) {
-    do {
-      $col = shift @available_columns;
-      push @retrieve_these, $col;
-    }
-    until (($col eq $args[6]) || (@available_columns == 0));
-    
-    # Ensure that if 'sample_name' is in @available_columns,
-    # 'barcode' is as well
-    # (vice versa ensured by @available_columns order!)
-    my $jn = join ' ', @retrieve_these;
-    if (($jn =~ /sample_name/) && ($jn !~ /barcode/)) {
-      push @retrieve_these, "barcode";
-    }
-  }
-  else {
-    if ($args[0]) { push @retrieve_these, 'instrument'; }
-    if ($args[1]) { push @retrieve_these, 'run'; }
-    if ($args[2]) { push @retrieve_these, 'lane'; }
-    if ($args[4] || $args[5]) {
-      push @retrieve_these, 'sample_name';
-      push @retrieve_these, 'barcode';
-    }
-    if ($args[3]) { push @retrieve_these, 'pair'; }
-  }
-  $col = join ',', @retrieve_these;
-  
-  my @where_components = ();
-  my @query_values = ();
-  if ($args[0]) { push @where_components, 'instrument = ? ';  push @query_values, $args[0]; }
-  if ($args[1]) { push @where_components, 'run = ? ';         push @query_values, $args[1]; }
-  if ($args[2]) { push @where_components, 'lane = ? ';        push @query_values, $args[2]; }
-  if ($args[4]) { push @where_components, 'sample_name = ? '; push @query_values, $args[4]; }
-  if ($args[5]) { push @where_components, 'barcode = ? ';     push @query_values, $args[5]; }
-  if ($args[3]) { push @where_components, 'pair = ? ';        push @query_values, $args[3]; }
-  
-  my $statement = "SELECT $col FROM run ";
-  if (@where_components) {
-    my $where_string = join 'AND ', @where_components;
-    $where_string = "WHERE $where_string";
-    $statement = $statement.$where_string;
-  }
-  $statement = $statement."GROUP BY $col ORDER BY $col";
-  
+  my $statement = "CALL list_subdivisions(?,?,?,?,?,?,?,?,?,?,?,?)";
   my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute(@query_values);
+  foreach my $i (1..12) {
+    $sth->bind_param($i, $args[$i-1]);
+  }
+  
+  $sth->execute();
   
   return Reports::ReportTable->new($sth);
 }
+
+
+
+# These three subs take care of barcode/sample name interchange.
+# I.e., when you have one, you most likely want the other at some point too.
+# Note that sample names are (or should be) unique, so no further
+# information need be supplied; barcodes, however, are not, so
+# run ID should also be passed.
 
 sub list_barcodes_for_run_and_lane() {
   my $self = shift;
@@ -346,9 +652,22 @@ sub list_barcodes_for_run_and_lane() {
   my $lane = shift;
 
   my $con = $self->get_connection();
-  my $statement = "SELECT barcode FROM run WHERE `run` = ? AND `lane` = ? GROUP BY barcode";
+  #my $statement = "SELECT barcode FROM run WHERE `run` = ? AND `lane` = ? GROUP BY barcode";
+  my $statement = "CALL list_barcodes_for_run_and_lane (?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->execute($run, $lane);
+
+  return Reports::ReportTable->new($sth);
+}
+
+sub get_barcodes_for_sample_name() {
+  my $self = shift;
+  my $sample = shift;
+
+  my $con = $self->get_connection();
+  my $statement = "CALL list_barcodes_for_sample(?)";
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  $sth->execute($sample);
 
   return Reports::ReportTable->new($sth);
 }
@@ -360,70 +679,91 @@ sub get_samples_from_run_lane_barcode() {
   my $barcode = shift;
 
   my $con = $self->get_connection();
-  my $statement = "SELECT sample_name FROM run WHERE `run` = ? AND `lane` = ? AND `barcode` = ?";
+  #my $statement = "SELECT sample_name FROM run WHERE `run` = ? AND `lane` = ? AND `barcode` = ?";
+  my $statement = "CALL get_sample_from_run_lane_barcode (?,?,?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($run, $lane, $barcode);
-
+  $sth->bind_param(1, $run);
+  $sth->bind_param(2, $lane);
+  $sth->bind_param(3, $barcode);
+  $sth->execute();
+  
   return Reports::ReportTable->new($sth);
 }
 
 sub get_encoding_for_run() {
+  # Specifically retrieves the encoding property for a given run.
   my $self = shift;
   my $run = shift;
-
+  
   my $con = $self->get_connection();
-  my $statement = "SELECT encoding FROM run WHERE `run` = ? AND encoding IS NOT NULL GROUP BY encoding";
+  #my $statement = "SELECT encoding FROM run WHERE `run` = ? AND encoding IS NOT NULL GROUP BY encoding";
+  my $statement = "CALL get_encoding_for_run (?)";
   my $sth = $con->prepare($statement) || die $con->errstr;
   $sth->execute($run);
-
+  
   return Reports::ReportTable->new($sth);
 }
 
 sub get_analysis_id() {
+  # Returns the unique numeric ID of a particular analysis
+  # Note that if some inputs are not supplied, a list of analysis IDs
+  # can be returned instead. 
   my $self = shift;
   my $pref = shift;
-  my %properties = %$pref; 
   
   my @args = (undef, undef, undef, undef, undef, undef);
-  $args[0] = $properties{INSTRUMENT} if exists $properties{INSTRUMENT};
-  $args[1] = $properties{RUN} if exists $properties{RUN};
-  $args[2] = $properties{LANE} if exists $properties{LANE};
-  $args[3] = $properties{PAIR} if exists $properties{PAIR};
-  $args[4] = $properties{SAMPLE} if exists $properties{SAMPLE};
-  $args[5] = $properties{BARCODE} if exists $properties{BARCODE};
+  $args[0] = $pref->{INSTRUMENT} if exists $pref->{INSTRUMENT};
+  $args[1] = $pref->{RUN} if exists $pref->{RUN};
+  $args[2] = $pref->{LANE} if exists $pref->{LANE};
+  $args[3] = $pref->{PAIR} if exists $pref->{PAIR};
+  $args[4] = $pref->{SAMPLE_NAME} if exists $pref->{SAMPLE_NAME};
+  $args[5] = $pref->{BARCODE} if exists $pref->{BARCODE};
+  $args[6] = $pref->{TOOL} if exists $pref->{TOOL};
   
-  my @query_values = ();
-  my @where_components = ();
-  if ($args[0]) { push @where_components, 'instrument = ? ';  push @query_values, $args[0]; }
-  if ($args[1]) { push @where_components, 'run = ? ';         push @query_values, $args[1]; }
-  if ($args[2]) { push @where_components, 'lane = ? ';        push @query_values, $args[2]; }
-  if ($args[4]) { push @where_components, 'sample_name = ? '; push @query_values, $args[4]; }
-  if ($args[5]) { push @where_components, 'barcode = ? ';     push @query_values, $args[5]; }
-  if ($args[3]) { push @where_components, 'pair = ? ';        push @query_values, $args[3]; }
+  my $statement = "CALL get_analysis_id(?,?,?,?,?,?,?)";
   
-  my $statement = "SELECT analysis_id FROM run WHERE ";
-  if (@where_components) {
-    my $where_string = join 'AND ', @where_components;
-    $statement = $statement.$where_string;
+  my $con = $self->get_connection();
+  $self->set_duplicate_detection_type($pref, $con);
+  my $sth = $con->prepare($statement) || die $con->errstr;
+  foreach my $i (1..7) {
+    $sth->bind_param($i, $args[$i-1]);
   }
-  $statement = $statement."GROUP BY analysis_id";
+  $sth->execute();
+  
+  return Reports::ReportTable->new($sth);
+}
+
+sub check_analysis_id() {
+  # Checks if the numeric ID of a particular analysis is present in the
+  # database.
+  my $self = shift;
+  my $pref = shift;
+  
+  my @args = (undef);
+  $args[0] = $pref->{ANALYSIS} if exists $pref->{ANALYSIS};
+  
+  my $statement = "CALL analysis_id_check(?)";
   
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute(@query_values);
+  $sth->bind_param(1, $args[0]);
+  $sth->execute();
   
   return Reports::ReportTable->new($sth);
 }
 
 sub get_properties_for_analysis_ids() {
+  # Retrieves all the properties associated with an analysis ID.
+  # If given a list of analysis IDs, it will retrieve the properties for all of them.
   my $self = shift;
   my $idref = shift;
-  my @args = @$idref; 
+  my @analysis_ids = @$idref; 
   
   # Add bits to the statement to reflect available information
+  
   my $statement = "SELECT property, value FROM analysis_property ";
   my @where_components = ();
-  foreach (1..@args) {
+  foreach my $i (1..@analysis_ids) {
     push @where_components, "analysis_id = ? ";
   }
   
@@ -436,38 +776,11 @@ sub get_properties_for_analysis_ids() {
   
   my $con = $self->get_connection();
   my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute(@args);
+  foreach my $i (1..@analysis_ids) {
+    $sth->bind_param($i, $analysis_ids[$i-1]);
+  }
+  $sth->execute();
   
-  return Reports::ReportTable->new($sth);
-}
-
-
-# These two take care of barcode/sample name interchange.
-# Note that sample names are (or should be) unique, so no further
-# information need be supplied; barcodes, however, are not, so
-# run ID should also be passed.
-sub get_barcodes_for_sample_name() {
-  my $self = shift;
-  my $sample = shift;
-
-  my $con = $self->get_connection();
-  my $statement = "SELECT barcode FROM run WHERE `sample_name` = ? GROUP BY barcode";
-  my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($sample);
-
-  return Reports::ReportTable->new($sth);
-}
-
-sub get_sample_name_for_barcode() {
-  my $self = shift;
-  my $run = shift;
-  my $sample = shift;
-
-  my $con = $self->get_connection();
-  my $statement = "SELECT barcode FROM run WHERE `run` = ? AND `sample_name` = ? GROUP BY barcode";
-  my $sth = $con->prepare($statement) || die $con->errstr;
-  $sth->execute($run, $sample);
-
   return Reports::ReportTable->new($sth);
 }
 

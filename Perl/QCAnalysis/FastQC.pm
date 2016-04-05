@@ -62,9 +62,6 @@ sub parse_file(){
 	my $module;
 	my $status;
 	
-	
-	
-	
 	while ( $line = $fh->getline() ) {
 	    chomp($line);
 		if($line =~ /##FastQC	(\S*)/){
@@ -124,7 +121,7 @@ sub parse_Basic_Statistics {
     	if($to_parse =~ m/^#/){
     		#It is a comment. 
     	}elsif($to_parse =~ /([\S| ]+)\t([\S| ]+)/){
-    #		print $1."\n";
+    		#print $1."\n";
     		if($1 eq "Sequence length"){
 				(my $min, my $max) = parse_range($2);
 				$analysis->add_general_value("general_min_length", $min);
@@ -134,7 +131,7 @@ sub parse_Basic_Statistics {
     		}else{
 				$analysis->add_property($1, $2);
 			}
-#			$self->{$1} = $2;
+			#$self->{$1} = $2;
 		}elsif ( $to_parse =~ />>(.*)/ ) {
             unless ( $to_parse =~ m/>>END_MODULE/ ) {
                 die "Missformated file!";
@@ -184,7 +181,6 @@ sub parse_module{
 				}
 			}
 		}else {
-     
 			if(defined $line_functions{$function}){
 				&$function($analysis, $to_parse);
 			}else{
@@ -193,8 +189,6 @@ sub parse_module{
 					 $analysis->$function($line[0], $header[$i], $line[$i]);
 				}
 			}
-
-			
         }
     }
 #	print "\n";
@@ -230,7 +224,7 @@ sub parse_Per_base_GC_content {
 }
 
 sub parse_Per_sequence_GC_content {
-   parse_partition(shift, shift, "gc_content");
+    parse_partition(shift, shift, "gc_content");
 }
 
 sub parse_Per_base_N_content {
@@ -238,15 +232,15 @@ sub parse_Per_base_N_content {
 }
 
 sub parse_Sequence_Length_Distribution {
-       parse_partition(shift, shift, "sequence_length");
+    parse_partition(shift, shift, "sequence_length");
 }
 
 sub parse_Sequence_Duplication_Levels {
-     parse_position(shift, shift, "duplication_level");
+    parse_position(shift, shift, "duplication_level");
 }
 
 sub parse_Overrepresented_sequences {
-    	parse_module(shift, shift, shift, "parse_overrepresented_sequences" );
+    parse_module(shift, shift, shift, "parse_overrepresented_sequences" );
 }
 
 sub parse_overrepresented_sequences{
@@ -255,7 +249,6 @@ sub parse_overrepresented_sequences{
 	my @line = split(/\t/, $to_parse);
 	$values{$line[0]} = "overrepresented_sequence";
 	$analysis->add_general_value($line[0], $line[1], $line[3]);
-	
 }
 
 
@@ -269,7 +262,6 @@ sub parse_overrepresented_kmer{
 	my @line = split(/\t/, $to_parse);
 	$values{$line[0]} = "overrepresented_kmer";
 	$analysis->add_general_value($line[0], $line[1]);
-	
 }
 
 sub get_value_types{

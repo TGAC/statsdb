@@ -1,12 +1,18 @@
+args <- commandArgs(trailingOnly = TRUE)
+qnum <- args[1]
 
-qualdata <- read.delim("gc_dist.df", header = TRUE, as.is = TRUE)
+dataName <- paste("gc_dist_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 
 # For some unfathomable reason, R refuses to take the series of numbers in
 # qualdata$Xvals as a vector, so it must be tricked into doing so.
 xVals <- seq (from = 1, to = max(qualdata$Xval), by = 1) 
 xTags <- seq (from = 0, to = max(qualdata$Xval), by = 1)
 
-pdf(file = "gc_dist_plot.pdf", width = 8, height = 6)
+plotName <- paste("gc_dist_plot_q", qnum, ".pdf", sep="")
+pdf(file = plotName, width = 8, height = 6)
+print(paste("PLOT FILE:",plotName))
+flush.console()
 
 marginSpaces = c(1, 0.1, 0)
 par (mgp = marginSpaces, tcl = -0.2)

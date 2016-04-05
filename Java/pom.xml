@@ -5,7 +5,7 @@
   <groupId>uk.ac.tgac</groupId>
   <artifactId>statsdb</artifactId>
   <packaging>pom</packaging>
-  <version>1.1</version>
+  <version>1.2-SNAPSHOT</version>
   <name>Stats DB Java API</name>
   <url>http://www.tgac.ac.uk/tools-resources/</url>
 

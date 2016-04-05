@@ -1,12 +1,24 @@
 # Need to make specific axis functions, so that I can make the y axis tick text go
 # horizontal.
 
-qualdata <- read.delim("quality.df", header = TRUE, as.is = TRUE)
+args <- commandArgs(trailingOnly = TRUE)
+dataFile <- args[1]
+qnum <- args[2]
+plotTitle <- args[3]
+xLabel <- args[4]
+yLabel <- args[5]
+
+dataName <- paste("quality_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 dat <- subset(qualdata, select = c('X90th.Percentile','Upper.Quartile','Median','Lower.Quartile','X10th.Percentile'))
 datmat <- t(data.matrix(dat))
 z <- list(stats = datmat, names = qualdata$Interval)
 
-pdf(file = "quality_plot.pdf", width = 8, height = 6)
+plotName <- paste("quality_plot_q", qnum, ".pdf", sep="")
+pdf(file = plotName, width = 8, height = 6)
+print(paste("PLOT FILE:",plotName))
+flush.console()
+
 bxp (z, 
      axes=FALSE,
      )

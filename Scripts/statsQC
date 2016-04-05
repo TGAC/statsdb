@@ -16,6 +16,7 @@ my $lane;
 my $barcode;
 my $pair;
 my $path="";
+my $sequencer_path="";
 my $help;
 my $sample_sheet;
 my $sample_sheet_string;
@@ -31,6 +32,7 @@ my $run;
 	's=s'	=> \$software_on_instrument_version,
 	'v=s'	=> \$cassava_version,
 	'p=s'	=> \$path,
+	'rp=s'	=> \$sequencer_path,
 	'b=s'	=> \$sample_sheet,
 	'bs=s'	=> \$sample_sheet_string,
 	'r=s'	=> \$run,
@@ -46,11 +48,12 @@ print "\nUSAGE: statsQC\n
 	-v	CASAVA_VERSION (1.8.2, 1.7.0 ETC.)
 	-p	RUN_FOLDER (PATH TO FOLDER CONTAINING THE PROJECTS, e.g. */BaseCalls/Unaligned/, or \".\"
                 assumes current location if argument is not provided, i.e. defaults to \".\")
+	-rp	SEQUENCER PATH (Path to folder containing raw data, RunInfo.xml, logs etc.)
 	-b	SampleSheet.csv
 	-bs	SampleSheet as a String to write to disk
 	-r	Run title (e.g. 120118_SN7001150_0058_BC0FRPACXX)
 	-h	Print this help message\n\n";
-exit;
+	exit;
 }
 
 unless (($experiment_type and $instrument and $chemistry_version and $software_on_instrument_version and $cassava_version and $run) or $help){
@@ -62,11 +65,12 @@ print "\nUSAGE: statsQC\n
 	-v	CASAVA_VERSION (1.8.2, 1.7.0 ETC.)
 	-p	RUN_FOLDER (PATH TO FOLDER CONTAINING THE PROJECTS, e.g. */BaseCalls/Unaligned/, or \".\"
                 assumes current location if argument is not provided, i.e. defaults to \".\")
+	-rp	SEQUENCER PATH (Path to folder containing raw data, RunInfo.xml, logs etc.)
 	-b	SampleSheet.csv
 	-bs     SampleSheet as a String to write to disk
 	-r	Run title (e.g. 120118_SN7001150_0058_BC0FRPACXX)
 	-h	Print this help message\n\n";
-exit;
+	exit;
 }
 
 # A check to see if the user provided a "." character to indicate the location of the directory containing the projects,
@@ -103,7 +107,7 @@ open(SDSH, ">".$path."/statsDB_string.txt");
 #open(SDSH, ">./statsDB_string_TEST.txt");
 
 # Print the header
-print SDSH "TYPE_OF_EXPERIMENT\tPATH_TO_ANALYSIS\tANALYSIS_TYPE\tINSTRUMENT\tCHEMISTRY_VERSION\tSOFTWARE_ON_INSTRUMENT_VERSION\tCASSAVA_VERSION\tRUN_FOLDER\tSAMPLE_NAME\tLANE\tBARCODE\tPAIR\tRUN\n";
+print SDSH "TYPE_OF_EXPERIMENT\tPATH_TO_ANALYSIS\tANALYSIS_TYPE\tINSTRUMENT\tCHEMISTRY_VERSION\tSOFTWARE_ON_INSTRUMENT_VERSION\tCASSAVA_VERSION\tRUN_FOLDER\tSEQUENCER_FOLDER\tSAMPLE_NAME\tLANE\tBARCODE\tPAIR\tRUN\n";
 
 local $/ = undef;
 
@@ -120,7 +124,7 @@ local $/ = "\n";
 foreach my $line (@lines) {
     chomp;
     if ($counter > 0){
-	### FastQC ###
+		### FastQC ###
         my ($fcid,$lane,$sampleid,$sampleref,$index,$description,$control,$recipe,$operator,$project) = split(/,/, $line);
         # First pair grab
         my $pp1 = $path."/Project_".$project."/Sample_".$sampleid."/Stats/*L00".$lane."*R1*fastqc/fastqc_data.txt";
@@ -128,58 +132,91 @@ foreach my $line (@lines) {
         chomp $path_to_analysis1;
         $path_to_analysis1 =~ /.*L00\d_R(\d)_(\d{3}_)*fastqc.*/;
         $pair1 = $1;
-
+		
         #Second pair grab
         my $pp2 = $path."/Project_".$project."/Sample_".$sampleid."/Stats/*L00".$lane."*R2*fastqc/fastqc_data.txt";
         $path_to_analysis2 = `echo $pp2`;
         chomp $path_to_analysis2;
         $path_to_analysis2 =~ /.*L00\d_R(\d)_(\d{3}_)*fastqc.*/;
         $pair2 = $1;
-
+		
         # First pair print
-        my $stats_DB_string1 = $experiment_type ."\t" . $path_to_analysis1 ."\tFastQC\t"  .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair1 . "\t".$run;
+        my $stats_DB_string1 = $experiment_type ."\t" . $path_to_analysis1 ."\tFastQC\t" . $instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sequencer_path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair1 ."\t".$run;
         if (-e $path_to_analysis1){
             print SDSH "$stats_DB_string1\n";
         }
         else {
-	    print "Can't find [$path_to_analysis1]\n";
+			print "Can't find [$path_to_analysis1]\n";
         }
         
         # Second pair print
-        my $stats_DB_string2 = $experiment_type ."\t" . $path_to_analysis2 ."\tFastQC\t"  .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair2 . "\t".$run;
+        my $stats_DB_string2 = $experiment_type ."\t" . $path_to_analysis2 ."\tFastQC\t" . $instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sequencer_path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t" . $pair2 ."\t".$run;
         if (-e $path_to_analysis2){
             print SDSH "$stats_DB_string2\n";
         }
         else {
             print "Can't find [$path_to_analysis2]\n";
         }
-
-	### KmerContamination ###
+		
+		### KmerContamination ###
     	my $pp = $path."/ScreeningReports";
     	
-	opendir(DIR, $pp) or die $!;
-
+		opendir(DIR, $pp) or die $!;
+		
     	while (my $dir = readdir(DIR)) {
-	
-	    if ((-d "$pp/$dir") && ($dir !~ /^\./)) {
-		$path_to_analysis_shared = $pp."/".$dir."/".$project."_".$sampleid."_".$dir.".txt";
-		chomp $path_to_analysis_shared;
-		my $stats_DB_string_shared = $experiment_type ."\t" . $path_to_analysis_shared ."\tKmerContamination\t" .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t0\t".$run;
-        	if (-e $path_to_analysis2){
-            		print SDSH "$stats_DB_string_shared\n";
-       		} else {
-            		print "Can't find [$path_to_analysis_shared]\n";
-        	}
-	    }
-	    next;
+			if ((-d "$pp/$dir") && ($dir !~ /^\./)) {
+				$path_to_analysis_shared = $pp."/".$dir."/".$project."_".$sampleid."_".$dir.".txt";
+				chomp $path_to_analysis_shared;
+				my $stats_DB_string_shared = $experiment_type ."\t" . $path_to_analysis_shared ."\tKmerContamination\t" .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sequencer_path ."\t" . $sampleid ."\t" . $lane ."\t" . $index ."\t0\t".$run;
+				if (-e $path_to_analysis2){
+					print SDSH "$stats_DB_string_shared\n";
+				} else {
+					print "Can't find [$path_to_analysis_shared]\n";
+				}
+			}
+			next;
     	}
-
+		
     	closedir(DIR);
-
-	
+		
+		### MISO ###
+		my $stats_DB_string_miso = $experiment_type ."\t" . $path_to_analysis_shared ."\tMISO\t"  .$instrument ."\t" . $chemistry_version ."\t" . $software_on_instrument_version ."\t" . $cassava_version ."\t" . $path ."\t" . $sequencer_path ."\t" . $sampleid ."\t" . $lane ."\tn.a.\tn.a.\t".$run;
+		if (-e $path_to_analysis2){
+			print SDSH "$stats_DB_string_miso\n";
+		} else {
+			print "Can't find [$path_to_analysis_shared]\n";
+		}
+		
     }
     $counter++;
 }
+
+### InterOp ###
+# Problem is that we need run directory - ACTUAL run directory, not the one labeled here as the run directory ($path).
+# That's actually the PAP directory. To avoid further confusion, I'll call the one we need the sequencer directory,
+# because that's what it's called elsewhere.
+# I can figure it out, but it would be far better if it were passed as an input. 
+
+# Get a list of files
+my @interop_files = `ls -lth $sequencer_path/InterOp/`;
+
+# Remove any InterOp files as specified by the config
+
+
+# Make a line for each remaining InterOp file
+foreach my $file (@interop_files) {
+	chomp $file;
+	my $filepath = $sequencer_path.'/'.$file;
+	
+	my $stats_DB_string_miso = $experiment_type ."\t" . $filepath ."\tMISO\t"  .$instrument ."\tn.a.\tn.a.\tn.a.\tn.a.\t" . $sequencer_path ."\tn.a.\tn.a.\tn.a.\tn.a.\t".$run;
+	if (-e $path_to_analysis2){
+		print SDSH "$stats_DB_string_miso\n";
+	} else {
+		print "Can't find [$path_to_analysis_shared]\n";
+	}
+}
+
+
 
 close(SDSH);
 

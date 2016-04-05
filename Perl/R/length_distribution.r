@@ -1,8 +1,14 @@
+args <- commandArgs(trailingOnly = TRUE)
+qnum <- args[1]
 
-qualdata <- read.delim("length_dist.df", header = TRUE, as.is = TRUE)
+dataName <- paste("length_dist_q", qnum, ".df", sep="")
+qualdata <- read.delim(dataName, header = TRUE, as.is = TRUE)
 xvals = seq(from = 1, to = nrow(qualdata), by = 1)
 
-pdf(file = "length_dist_plot.pdf", width = 8, height = 6)
+plotName <- paste("length_dist_plot_q", qnum, ".pdf", sep="")
+pdf(file = plotName, width = 8, height = 6)
+print(paste("PLOT FILE:",plotName))
+flush.console()
 
 marginSpaces = c(1, 0.1, 0)
 par (mgp = marginSpaces, tcl = -0.2)
@@ -34,7 +40,7 @@ rect(x1, y1, x2, y2,
      border = NA,
      col = "#99999933")
 
-title(main = 'Distribution of sequnce lengths over all sequences', 
+title(main = 'Distribution of sequence lengths over all sequences', 
       cex.main = 0.8)
 
 axis (1, 
